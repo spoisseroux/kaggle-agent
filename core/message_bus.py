@@ -187,11 +187,13 @@ def wake_agent(message_text: str) -> bool:
     delivers it to Claude's input immediately.
     """
     try:
+        # List sessions and match EXACT name to avoid hitting grouped sessions
+        # like kaggle-agent-0 that the tray's tmux-open fallback can create.
         r = subprocess.run(
-            ["tmux", "has-session", "-t", _AGENT_SESSION],
-            capture_output=True, timeout=2,
+            ["tmux", "list-sessions", "-F", "#{session_name}"],
+            capture_output=True, text=True, timeout=2,
         )
-        if r.returncode != 0:
+        if _AGENT_SESSION not in r.stdout.split():
             return False
         subprocess.run(
             ["tmux", "send-keys", "-t", _AGENT_SESSION, message_text, "Enter"],

@@ -36,7 +36,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 
 API_BASE = "http://localhost:8765"
-DASHBOARD_URL = "https://kaggle.nnaq.net"
+DASHBOARD_URL = "https://kaggle-ui.nnaq.net"
 POLL_INTERVAL_S = 5
 HTTP_TIMEOUT = 4
 ACTION_TIMEOUT = 20
@@ -126,24 +126,26 @@ def _schtasks_set(task_name: str, enable: bool) -> bool:
 
 
 def _open_tmux_window() -> None:
-    """Open a Windows Terminal (or cmd) attached to the kaggle-agent tmux session."""
-    cmd = (
-        f'wsl -d {WSL_DISTRO} -e bash -c '
-        f'"tmux attach -t kaggle-agent 2>/dev/null || '
-        f'tmux new-session -t kaggle-agent"'
+    """Open a Windows Terminal (or cmd) attached to the kaggle-agent tmux session.
+
+    Uses attach-session with -x (detach other clients) and exact session name.
+    Falls back to an informative shell if the session doesn't exist yet.
+    Never creates a bogus grouped session via 'new-session -t'.
+    """
+    bash_cmd = (
+        "tmux attach-session -t kaggle-agent 2>/dev/null || "
+        "{ echo 'kaggle-agent session not running — start it via wsl_startup.sh'; "
+        "cd /home/keehar/kaggle-agent && exec bash; }"
     )
-    # Try Windows Terminal first, fall back to cmd
+    # Try Windows Terminal first (no -d flag — avoids UNC/Windows path issues)
     try:
-        subprocess.Popen(["wt", "-d", ".", "wsl", "-d", WSL_DISTRO, "-e",
-                          "bash", "-c",
-                          "tmux attach -t kaggle-agent 2>/dev/null || "
-                          "tmux new-session -t kaggle-agent"])
+        subprocess.Popen(["wt", "wsl", "-d", WSL_DISTRO, "-e", "bash", "-c", bash_cmd])
         return
     except FileNotFoundError:
         pass
     subprocess.Popen(
-        ["cmd", "/c", "start", "cmd", "/k", f"wsl -d {WSL_DISTRO} -e bash -c "
-         "\"tmux attach -t kaggle-agent 2>/dev/null || tmux new-session -t kaggle-agent\""],
+        ["cmd", "/c", "start", "cmd", "/k",
+         f"wsl -d {WSL_DISTRO} -e bash -c \"{bash_cmd}\""],
     )
 
 
