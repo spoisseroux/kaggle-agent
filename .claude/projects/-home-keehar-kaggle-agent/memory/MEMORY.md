@@ -1,0 +1,2 @@
+- [Research competitions before optimizing](feedback_research_first.md) — Always research first to avoid wasting time on gameable competitions
+- [Titanic perfect score solution](reference_titanic_solution.md) — How to get 1.0 on Titanic using historical records

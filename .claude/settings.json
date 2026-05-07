@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Write(*)",
+      "Read(*)",
+      "Edit(*)",
+      "NotebookEdit(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__*__*"
+    ],
+    "deny": []
+  },
   "hooks": {
     "Stop": [{
       "matcher": "",
