@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-05-07 — Phase 6: message wake, run-stage, model API, tray settings, auto-restart
+
+### Fixes
+- **Messages no longer ignored:** inbound human messages now forwarded to Claude Code
+  stdin via `tmux send-keys` immediately, so the agent wakes without waiting for next loop
+- **Immediate ack:** `"Got it, thinking..."` posted to message_bus + Telegram before
+  agent responds (both `telegram_bot.py` and `POST /chat/send` + `/chat/ws`)
+
+### New API endpoints
+- `POST /system/checkpoint` — signal agent to save mid-run state before stopping
+- `GET /system/model` — current model + available list (haiku 4.5 / sonnet 4.6 / opus 4.7)
+- `POST /system/model` — switch model; takes effect on next agent restart
+
+### Updated `GET /system/state`
+Now includes `run_stage`, `run_stage_detail`, `run_eta_seconds`, `run_started_at`.
+Agent calls `system_control.set_run_stage(stage, detail, eta_seconds)`.
+Stages: `idle → downloading → eda → training → generating_submission → submitting → done`
+
+### Terminal WebSocket
+`/terminal/ws` now accepts `{type: "input", data: "<keys>"}` from client,
+forwarded to tmux via `send-keys`.
+
+### Tray (`tray/kaggle_tray.py`)
+- Tooltip shows run_stage + detail + ETA when running
+- Model submenu: radio Haiku/Sonnet/Opus, calls `POST /system/model`
+- "Start on startup" checkbox: toggles `"Kaggle Agent"` Task Scheduler task via `schtasks`
+- "Open tmux session": opens Windows Terminal / cmd with `wsl tmux attach`
+- `tray_launcher.py`: watches `kaggle_tray.py` mtime, auto-restarts on save
+- `start_tray.bat`: updated to launch via `tray_launcher.py`
+
+### Infrastructure
+- `scripts/watch_backend.sh` + `systemd/kaggle-api-watch.service`: `inotifywait`
+  watches `api/` and `core/` `.py` files, restarts `kaggle-api` on change
+- `scripts/start_agent.sh`: reads model from `.claude/kaggle_settings.json`,
+  passes `--model` flag to `claude`
+- `scripts/wsl_startup.sh`: logs to `logs/startup.log`, headless-friendly,
+  starts `kaggle-api-watch` service
+
 ## 2026-05-07 — KAGGLE_TOKEN → KAGGLE_KEY fix + system state management
 - Fixed: Renamed `KAGGLE_TOKEN` to `KAGGLE_KEY` in `.env` (Kaggle Python
   library requires `KAGGLE_KEY` + `KAGGLE_USERNAME`, not `KAGGLE_TOKEN`)
