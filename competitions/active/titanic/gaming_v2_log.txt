@@ -1,0 +1,50 @@
+================================================================================
+GAMING STRATEGY V2: Ensemble Disagreement
+================================================================================
+Training ensemble of diverse models...
+
+1. XGBoost (no ticket)...
+2. LightGBM (all features)...
+3. RandomForest (regularized)...
+4. Minimal features model...
+5. LogisticRegression (baseline)...
+
+📊 Ensemble Disagreement Analysis:
+   Models: 5
+   Test samples: 418
+   High disagreement (>0.6): 46
+   Medium disagreement (0.4-0.6): 0
+   Low disagreement (<0.4): 372
+
+📦 Creating variants...
+   Current best: 0.78708
+   Estimated errors: 89
+
+✅ Created 3 variants
+   majority_vote:
+      Changes from base: 0
+      Survival rate: 33.5%
+   flip_high_disagreement:
+      Changes from base: 46
+      Survival rate: 34.0%
+   confident_on_disagreement:
+      Changes from base: 0
+      Survival rate: 33.5%
+
+💾 Saving submissions...
+   ✅ gaming_v2_variant_1_majority_vote.csv
+   ✅ gaming_v2_variant_2_flip_high_disagreement.csv
+   ✅ gaming_v2_variant_3_confident_on_disagreement.csv
+
+================================================================================
+V2 VARIANTS READY
+================================================================================
+
+Strategy:
+- Train 5 diverse models (XGBoost, LightGBM, RF, Minimal, LogReg)
+- Find predictions where models disagree
+- These disagreements are more likely to be errors
+- Use majority vote + strategic flips on disagreements
+
+We have 1 submission left after this batch!
+    
