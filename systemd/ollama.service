@@ -1,0 +1,23 @@
+[Unit]
+Description=Ollama (Qwen3-14B) local inference server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keehar
+Group=keehar
+WorkingDirectory=/home/keehar
+Environment=HOME=/home/keehar
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_KEEP_ALIVE=24h
+Environment=OLLAMA_MODELS=/home/keehar/.ollama/models
+Environment=PATH=/home/keehar/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/keehar/.local/bin/ollama serve
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/keehar/kaggle-agent/logs/ollama.log
+StandardError=append:/home/keehar/kaggle-agent/logs/ollama.log
+
+[Install]
+WantedBy=multi-user.target
