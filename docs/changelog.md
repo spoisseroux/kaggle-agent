@@ -1,9 +1,18 @@
 # Changelog
 
+## 2026-05-07 — KAGGLE_TOKEN → KAGGLE_KEY fix + system state management
+- Fixed: Renamed `KAGGLE_TOKEN` to `KAGGLE_KEY` in `.env` (Kaggle Python
+  library requires `KAGGLE_KEY` + `KAGGLE_USERNAME`, not `KAGGLE_TOKEN`)
+- Removed shim logic from `api/main.py` that was copying KAGGLE_TOKEN to
+  KAGGLE_KEY at runtime
+- Updated all documentation: CLAUDE.md, PRD, HANDOFF.md, troubleshooting.md
+- Added system state management to `wsl_startup.sh`: automatically sets state
+  to "running" via `/system/resume` after services start
+
 ## 2026-05-06 — initial build (Phases 1–5)
 
 ### Phase 1 — connectivity + message bus
-- `.env` populated with KAGGLE_TOKEN (never KAGGLE_KEY), POSTGRES_DSN,
+- `.env` populated with KAGGLE_KEY, KAGGLE_USERNAME, POSTGRES_DSN,
   MCP_BEARER_TOKEN, HF_TOKEN
 - `.claude/mcp_config.json` points at the Tailscale memory MCP at
   `http://docker:8000` with bearer auth

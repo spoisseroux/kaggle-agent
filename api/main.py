@@ -274,13 +274,9 @@ def submissions(competition: str | None = None, limit: int = 50) -> list[dict]:
 def leaderboard(slug: str) -> dict:
     """Best-effort leaderboard using the Kaggle CLI."""
     try:
-        env = os.environ.copy()
-        # Kaggle CLI accepts KAGGLE_KEY too, but we standardise on KAGGLE_TOKEN.
-        if "KAGGLE_KEY" not in env and env.get("KAGGLE_TOKEN"):
-            env["KAGGLE_KEY"] = env["KAGGLE_TOKEN"]
         r = subprocess.run(
             ["kaggle", "competitions", "leaderboard", "-c", slug, "-s", "-v"],
-            capture_output=True, text=True, env=env, timeout=20,
+            capture_output=True, text=True, timeout=20,
         )
         return {"raw": r.stdout, "stderr": r.stderr, "rc": r.returncode}
     except FileNotFoundError:

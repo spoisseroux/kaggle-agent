@@ -174,8 +174,8 @@ kaggle-agent/
 TELEGRAM_BOT_TOKEN=8716779851:AAGfA0mJ0DBEX8MOKP1fqbZJ0nGoHc43ByI
 TELEGRAM_CHAT_ID=5332262167
 
-# Kaggle — KAGGLE_TOKEN only, never KAGGLE_KEY
-KAGGLE_TOKEN=KGAT_8faa4170883ec5f6b74adef04baffe57
+# Kaggle — API requires KAGGLE_KEY + KAGGLE_USERNAME
+KAGGLE_KEY=KGAT_8faa4170883ec5f6b74adef04baffe57
 KAGGLE_USERNAME=spoisseroux
 
 # Anthropic
@@ -693,7 +693,7 @@ Always append to docs/changelog.md with today's date and what changed.
 - Save YAML config before every experiment
 - Data lives in data/<slug>/ — never commit it
 - Training >30min → send notify at start
-- KAGGLE_TOKEN env var only — never use kaggle.json
+- KAGGLE_KEY + KAGGLE_USERNAME env vars only — never use kaggle.json
 ```
 
 ---

@@ -115,4 +115,4 @@ These are in `.gitignore` — leave them there.
 - Save YAML config before every experiment
 - Data lives in `data/<slug>/` — never commit it
 - Training >30min → send notify at start
-- `KAGGLE_TOKEN` env var only — never use `kaggle.json` or `KAGGLE_KEY`
+- `KAGGLE_KEY` + `KAGGLE_USERNAME` env vars only — never use `kaggle.json`

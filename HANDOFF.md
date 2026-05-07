@@ -175,7 +175,7 @@ SIGCONT (in case it was paused) → SIGTERM → 1 second grace → SIGKILL →
 | POST | `/competitions/switch` | body: `{slug}` |
 | GET  | `/experiments?competition=<slug>&limit=50` | rows from `kaggle_experiments` |
 | GET  | `/submissions?competition=<slug>` | rows from `kaggle_submissions` |
-| GET  | `/leaderboard/{slug}` | shells out to the Kaggle CLI; needs `KAGGLE_TOKEN` in env |
+| GET  | `/leaderboard/{slug}` | shells out to the Kaggle CLI; needs `KAGGLE_KEY` + `KAGGLE_USERNAME` in env |
 | GET  | `/logs?lines=200` | tails every `logs/*.log` |
 | GET  | `/chat/messages?limit=50` | recent messages (oldest first) |
 | POST | `/chat/send` | body: `{text}` — also forwards to Telegram as `[web] <text>` |
@@ -247,11 +247,9 @@ session is created by `scripts/wsl_startup.sh` at WSL boot.
    ```
    and `sudo systemctl restart kaggle-api`.
 
-2. **`KAGGLE_KEY` shim in `/leaderboard/{slug}`.** The endpoint copies
-   `KAGGLE_TOKEN` → `KAGGLE_KEY` at call time because some Kaggle CLI
-   versions still read the old variable. Per PRD this should never
-   happen anywhere else — and it doesn't; this is the single exception,
-   contained to one endpoint that shells out to the CLI.
+2. **Kaggle auth:** `.env` must have `KAGGLE_KEY` and `KAGGLE_USERNAME`.
+   The Kaggle Python library requires these exact variable names. Never use
+   `kaggle.json` — environment variables only.
 
 3. **`pynvml` deprecation warning.** Cosmetic — package functions are
    identical to `nvidia-ml-py`. Suppress with

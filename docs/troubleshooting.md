@@ -3,12 +3,10 @@
 ## Kaggle CLI auth
 - Symptom: `Successfully submitted` never appears, or 401/403 from
   `kaggle competitions ...`.
-- Cause: a `KGAT_*` token in `kaggle.json` or under `KAGGLE_KEY` is
-  silently rejected.
-- Fix: only `KAGGLE_TOKEN=KGAT_...` works. The systemd unit files load
-  this from `.env` via `EnvironmentFile=`. The `/leaderboard/{slug}`
-  endpoint copies `KAGGLE_TOKEN` into `KAGGLE_KEY` at call time because
-  the older Kaggle CLI versions still read `KAGGLE_KEY`.
+- Cause: Missing or incorrect `KAGGLE_KEY` or `KAGGLE_USERNAME` in `.env`.
+- Fix: Ensure both `KAGGLE_KEY=KGAT_...` and `KAGGLE_USERNAME=...` are set
+  in `.env`. The Kaggle Python library requires these exact variable names.
+  Never use `kaggle.json` — environment variables only.
 
 ## VRAM threshold mismatch with PRD
 - Symptom: `request_training_vram` returns False with `free=9190MB`.

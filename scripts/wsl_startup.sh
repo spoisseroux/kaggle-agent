@@ -12,6 +12,9 @@ sudo -n tailscale up --ssh --accept-routes --accept-dns=false || true
 # Local services
 sudo -n /bin/systemctl start telegram-bot kaggle-api mlflow ollama || true
 
+# Set system state to running after services are up
+sleep 5 && curl -s -X POST localhost:8765/system/resume || true
+
 # Persistent tmux session running the agent loop
 if ! tmux has-session -t kaggle-agent 2>/dev/null; then
   tmux new-session -d -s kaggle-agent -c /home/keehar/kaggle-agent \
