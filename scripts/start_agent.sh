@@ -21,7 +21,6 @@ PY
 
 exec claude \
   --dangerously-skip-permissions \
-  --context-window-compaction-threshold 0.6 \
   --mcp-config .claude/mcp_config.json \
   "You are the Kaggle agent. Active competition: $ACTIVE_SLUG.
    Read CLAUDE.md for full instructions.
