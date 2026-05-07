@@ -128,25 +128,23 @@ def _schtasks_set(task_name: str, enable: bool) -> bool:
 def _open_tmux_window() -> None:
     """Open a Windows Terminal (or cmd) attached to the kaggle-agent tmux session.
 
-    Uses attach-session with -x (detach other clients) and exact session name.
-    Falls back to an informative shell if the session doesn't exist yet.
-    Never creates a bogus grouped session via 'new-session -t'.
+    Passes tmux directly to WSL with no bash -c wrapper to avoid Windows
+    Terminal mis-parsing shell special characters in complex command strings.
     """
-    bash_cmd = (
-        "tmux attach-session -t kaggle-agent 2>/dev/null"
-        " || (echo 'kaggle-agent session not running -- start it via wsl_startup.sh';"
-        " cd /home/keehar/kaggle-agent && exec bash)"
-    )
-    # Try Windows Terminal first (no -d flag — avoids UNC/Windows path issues)
+    # Try Windows Terminal — pass tmux attach directly, no bash -c wrapper
     try:
-        subprocess.Popen(["wt", "wsl", "-d", WSL_DISTRO, "-e", "bash", "-c", bash_cmd])
+        subprocess.Popen([
+            "wt", "wsl", "-d", WSL_DISTRO, "--",
+            "tmux", "attach-session", "-t", "kaggle-agent",
+        ])
         return
     except FileNotFoundError:
         pass
-    subprocess.Popen(
-        ["cmd", "/c", "start", "cmd", "/k",
-         f"wsl -d {WSL_DISTRO} -e bash -c \"{bash_cmd}\""],
-    )
+    # Fall back to plain cmd
+    subprocess.Popen([
+        "cmd", "/c", "start", "wsl", "-d", WSL_DISTRO, "--",
+        "tmux", "attach-session", "-t", "kaggle-agent",
+    ])
 
 
 class KaggleTray:
