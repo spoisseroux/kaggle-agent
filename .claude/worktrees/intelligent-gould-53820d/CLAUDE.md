@@ -10,40 +10,6 @@ Read `competitions/registry.json` for `active`. Per-competition instructions
 live at `competitions/active/<slug>/CLAUDE.md`.
 
 ## Workflow (always follow this order)
-
-### Phase 0: RESEARCH (MANDATORY - do this FIRST!)
-**Time: 15-30 minutes**
-**Purpose: Understand the competition meta-game before coding**
-
-```bash
-# Run research script
-./scripts/research_competition.sh <slug>
-
-# Manual checks:
-1. Check leaderboard: Are there many perfect scores?
-2. Read top discussions: Any known issues/leaks/tricks?
-3. Analyze top 3-5 notebooks: What approaches win?
-4. Web search: "kaggle {slug} perfect score/leak/trick"
-5. Decide: Is this worth optimizing or just for learning?
-```
-
-**Red flags (stop/minimal effort):**
-- Many perfect scores (1.0) on leaderboard
-- Tiny test set (<500 samples)
-- "Getting started" or tutorial competition
-- Answers/test set publicly available
-
-**Green flags (worth optimizing):**
-- Active competition with prizes
-- Large test set (>1000 samples)
-- Realistic score distribution
-- Recent competition
-
-**Critical lesson from Titanic:**
-Spent 15 min optimizing to 0.787 without realizing hundreds had 1.0 (test set gameable).
-Always research first!
-
-### Phase 1-8: Technical Workflow (if competition is worth it)
 1. EDA — understand data, target distribution, missing values, feature types
 2. Data pipeline — run all 4 stages: refine → enrich → synthetic → fuzz
 3. Baseline — working end-to-end pipeline with a simple model

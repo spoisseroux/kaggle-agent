@@ -1,0 +1,20 @@
+[Unit]
+Description=Kaggle Agent FastAPI bridge
+After=network-online.target telegram-bot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keehar
+Group=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+EnvironmentFile=/home/keehar/kaggle-agent/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/keehar/kaggle-venv/bin/python /home/keehar/kaggle-agent/api/main.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/keehar/kaggle-agent/logs/kaggle-api.log
+StandardError=append:/home/keehar/kaggle-agent/logs/kaggle-api.log
+
+[Install]
+WantedBy=multi-user.target
