@@ -1,19 +1,14 @@
 @echo off
 REM Kaggle Agent system tray launcher (Windows).
-REM Starts tray_launcher.py with pythonw (no console window).
-REM tray_launcher.py watches kaggle_tray.py for changes and auto-restarts the
-REM tray whenever the source file is saved — no manual restart needed.
+REM Uses a hardcoded UNC path so this bat works when run from the startup
+REM folder, a desktop shortcut, or any other location — cmd.exe cannot
+REM set a UNC path as the working directory, so relative paths break.
 
-setlocal
-pushd "%~dp0"
+set "SCRIPT=\\wsl.localhost\Ubuntu-24.04\home\keehar\kaggle-agent\tray\tray_launcher.py"
 
-REM Use pythonw if available (no console window); fall back to python.
 where pythonw >nul 2>nul
 if %errorlevel%==0 (
-    start "" pythonw tray_launcher.py
+    start "" pythonw "%SCRIPT%"
 ) else (
-    start "" python tray_launcher.py
+    start "" python "%SCRIPT%"
 )
-
-popd
-endlocal

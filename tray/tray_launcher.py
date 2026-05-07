@@ -5,6 +5,8 @@ Run this script directly (python tray_launcher.py) for visible output.
 
 Behaviour
 ---------
+- Enforces single-instance via a Windows named mutex — a second launch exits
+  immediately rather than creating a duplicate tray icon.
 - Starts kaggle_tray.py as a child pythonw process.
 - Polls kaggle_tray.py mtime every 2 seconds.
 - On change: gracefully terminates the child, waits up to 5s, then restarts.
@@ -12,11 +14,23 @@ Behaviour
 """
 from __future__ import annotations
 
+import ctypes
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+_MUTEX_NAME = "KaggleTrayLauncher_SingleInstance"
+
+def _acquire_single_instance_mutex() -> object:
+    """Create a named mutex. If it already exists, another instance is running — exit."""
+    kernel32 = ctypes.windll.kernel32
+    mutex = kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+    if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        print("Kaggle tray is already running — exiting.", flush=True)
+        sys.exit(0)
+    return mutex  # keep reference alive for process lifetime
 
 TRAY_SCRIPT = Path(__file__).resolve().parent / "kaggle_tray.py"
 POLL_INTERVAL_S = 2
@@ -80,4 +94,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    _mutex = _acquire_single_instance_mutex()
     main()
