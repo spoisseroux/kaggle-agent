@@ -1,0 +1,18 @@
+[Unit]
+Description=Restart kaggle-api when Python source files change
+After=kaggle-api.service
+Requires=kaggle-api.service
+
+[Service]
+Type=simple
+User=keehar
+Group=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+ExecStart=/home/keehar/kaggle-agent/scripts/watch_backend.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/keehar/kaggle-agent/logs/kaggle-api-watch.log
+StandardError=append:/home/keehar/kaggle-agent/logs/kaggle-api-watch.log
+
+[Install]
+WantedBy=multi-user.target

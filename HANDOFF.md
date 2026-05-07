@@ -1,7 +1,7 @@
 # Kaggle Agent — Handoff
 
-This file documents the **as-built** state at the end of Phase 5. Where it
-diverges from `kaggle-agent-PRD-final.md`, this file wins. Pass this to the
+This file documents the **as-built** state (Phase 5 + Phase 6 updates). Where
+it diverges from `kaggle-agent-PRD-final.md`, this file wins. Pass this to the
 agency-platform Web UI session along with PRD §11 and §17 for the UI spec.
 
 ---
@@ -22,6 +22,8 @@ network and use `http://kaggle:8765` (or `http://<tailscale-ip>:8765`).
   `.env`. Set it before exposing publicly.
 - **API → memory stack:** Postgres uses the credentials in `.env`
   (`POSTGRES_DSN`); MCP uses `MCP_BEARER_TOKEN` from `.env`.
+
+---
 
 ## Confirmed working endpoints
 
@@ -46,7 +48,9 @@ Live response captured at end of build:
 }
 ```
 
-### State machine — pause / resume / stop
+---
+
+### State machine — pause / resume / stop / checkpoint
 
 Four endpoints control the agent's lifecycle without ever touching the
 FastAPI service or Telegram bot themselves (those must always stay up so
@@ -54,120 +58,151 @@ the user can issue commands).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/system/state` | current state + when it was set |
+| GET | `/system/state` | current state + run stage + active competition |
 | POST | `/system/pause` | freeze agent processes via cgroupv2 + stop Ollama |
 | POST | `/system/resume` | thaw / recreate agent + start Ollama |
 | POST | `/system/stop` | SIGTERM agent processes + kill tmux + stop Ollama |
+| POST | `/system/checkpoint` | signal agent to save mid-run state before stopping |
 
-States are: `running`, `paused`, `stopped` (plus `transitioning` shown
+States: `running`, `paused`, `stopped` (plus `transitioning` shown
 purely client-side while a request is in flight). Persisted to
-`state.json` in the repo root and reconciled on read — if `state.json`
-says `running` but the tmux session is gone, the API reports `stopped`
-with `note: "session_missing"`. **No state-changing endpoint clears the
-note**; only fresh transitions do.
+`state.json` in the repo root and reconciled on read.
 
-Implementation detail worth knowing for the UI: pause uses cgroupv2
-`cgroup.freeze` rather than `SIGSTOP`. On WSL2 with systemd, SIGSTOP
-delivered cross-cgroup is silently ignored (a CPU-bound python keeps
-running at 100% after `kill -STOP` returns success). cgroup.freeze works
-reliably and is owned by the user, so no sudo is needed.
+Implementation detail: pause uses cgroupv2 `cgroup.freeze` rather than
+`SIGSTOP`. On WSL2 with systemd, SIGSTOP delivered cross-cgroup is
+silently ignored. cgroup.freeze works reliably and is owned by the user.
 
-#### `GET /system/state` — example
+#### `GET /system/state` — full schema
+
 ```json
 {
   "state": "running",
   "since": 1778125260.9,
-  "active_competition": null
-}
-```
-When the agent has crashed or been killed externally:
-```json
-{
-  "state": "stopped",
-  "since": 1778125261.0,
-  "note": "session_missing",
-  "active_competition": null
+  "active_competition": "titanic",
+
+  "run_stage": "training",
+  "run_stage_detail": "epoch 14/50",
+  "run_eta_seconds": 840,
+  "run_started_at": "2026-05-07T05:30:00Z"
 }
 ```
 
-#### `POST /system/pause` — example response
-```json
-{
-  "state": "paused",
-  "since": 1778125257.7,
-  "paused_pids": 1,
-  "frozen_scopes": 1,
-  "active_competition": null
-}
-```
-Side effects: every PID in the `kaggle-agent` tmux session has its cgroup
-frozen; Ollama service is stopped; a Telegram message `⏸ Agent paused.`
-is sent.
+`run_stage` is only present when the agent has set it. Possible values:
 
-#### `POST /system/resume` — example response
-```json
-{
-  "state": "running",
-  "since": 1778125260.9,
-  "resumed_pids": 1,
-  "thawed_scopes": 1,
-  "active_competition": null
-}
-```
-If the tmux session is missing (we were `stopped`), this endpoint runs
-`tmux new-session -d -s kaggle-agent ... bash scripts/start_agent.sh`
-to recreate it, then thaws the scope and starts Ollama. Telegram
-notification: `▶ Agent resumed.`
+| `run_stage` | Meaning |
+|---|---|
+| `idle` | nothing running (or key absent) |
+| `downloading` | fetching competition data |
+| `eda` | exploratory data analysis |
+| `training` | model training loop |
+| `generating_submission` | creating submission file |
+| `submitting` | uploading to Kaggle |
+| `done` | run completed |
 
-#### `POST /system/stop` — example response
-```json
-{
-  "state": "stopped",
-  "since": 1778125274.6,
-  "terminated_pids": 1,
-  "active_competition": null
-}
-```
-SIGCONT (in case it was paused) → SIGTERM → 1 second grace → SIGKILL →
-`tmux kill-session` → `systemctl stop ollama`. Telegram notification:
-`■ Agent stopped.`
+UI: show a progress banner when `state == "running"` and `run_stage` is
+present and not `idle`/`done`. Format ETA as "~14m left". Strip the
+banner when state transitions away from running.
 
-### `GET /system/ssh-info`
+When the agent crashes or is killed externally:
 ```json
-{
-  "tailscale_hostname": "kaggle",
-  "ssh_command": "ssh keehar@kaggle",
-  "tmux_command": "ssh keehar@kaggle -t tmux attach -t kaggle-agent",
-  "tailscale_connected": true
-}
+{ "state": "stopped", "since": 1778125261.0, "note": "session_missing", "active_competition": null }
 ```
 
-### `GET /memory/status`
+#### `POST /system/checkpoint`
+Signals the agent to save mid-run state (useful before issuing Stop).
+Also forwards a wake-key to the tmux session so the agent sees it quickly.
 ```json
-{
-  "postgres": { "status": "online", "host": "docker", "db": "claude_memory",
-                "tables_count": 5, "latency_ms": 146 },
-  "qdrant":   { "status": "online", "host": "docker",
-                "collections": [
-                  {"name": "kaggle_features", "vectors_count": 0},
-                  {"name": "claude_memory",   "vectors_count": 106},
-                  {"name": "kaggle_insights", "vectors_count": 0},
-                  {"name": "kaggle_errors",   "vectors_count": 0},
-                  {"name": "kaggle_experiments","vectors_count": 0}
-                ] },
-  "mcp":       { "status": "online", "host": "docker", "latency_ms": 112 },
-  "tailscale": { "connected": true, "latency_ms": 146 }
-}
+{ "state": "running", "checkpoint_requested": true, "checkpoint_requested_at": "2026-05-07T12:00:00Z" }
+```
+UI: show a toast "Checkpoint requested" with no further action needed.
+
+---
+
+### Model selection
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/system/model` | current model + available list |
+| POST | `/system/model` | switch model (takes effect on next agent restart) |
+
+```json
+// GET /system/model
+{ "model": "claude-sonnet-4-6", "available": ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7"] }
+
+// POST /system/model  body: {"model": "claude-opus-4-7"}
+{ "model": "claude-opus-4-7", "restart_required": true, "note": "Model takes effect when the agent session restarts (stop + resume)" }
 ```
 
-### `GET /ollama/status`
-```json
-{ "ok": true, "models": [{"name": "qwen3:14b", ...}] }
-```
+Model is persisted to `.claude/kaggle_settings.json` and read by
+`scripts/start_agent.sh` at startup via `claude --model <id>`. The model
+cannot change mid-session — the agent must be stopped and resumed.
 
-### Other endpoints — same shapes as PRD §10
+UI: show a dropdown/radio with the three models. After selecting, call
+POST and show "Restart agent to apply" notice if `restart_required: true`.
+
+---
+
+### Chat — message behaviour (Phase 6 update)
+
+**Immediate acknowledgment:** when a human message arrives (from Telegram
+or web), the system posts `"Got it, thinking..."` to the message bus
+*before* the agent has time to respond. The WS `/chat/ws` broadcasts this
+within ~1 s — no extra UI work needed.
+
+**Agent wake:** alongside the ack, the backend sends the message text to
+Claude Code's stdin via `tmux send-keys`. This means messages no longer
+sit unread in the SQLite queue when the agent is idle at its `>` prompt.
+
 | Method | Path | Notes |
 |---|---|---|
+| GET | `/chat/messages?limit=50` | recent messages, oldest first |
+| POST | `/chat/send` | body: `{text}` — posts ack, wakes agent, forwards to Telegram |
+| WS | `/chat/ws` | initial dump of last 50, then live; send `{"text":"..."}`, get `{"ack":"<id>"}` |
+
+Chat message schema:
+```json
+{
+  "id": "...",
+  "role": "agent" | "human",
+  "source": "telegram" | "web" | "agent" | "system",
+  "text": "...",
+  "status": "new" | "claimed" | "consumed" | "delivered",
+  "ask_id": null,
+  "created_at": 1778125260.9
+}
+```
+
+---
+
+### Terminal WebSocket
+
+`WS /terminal/ws` — streams live tmux pane output; also accepts keystrokes.
+
+**Server → client:**
+```json
+{ "type": "output", "data": "<pane content>", "ts": "2026-05-07T12:00:00Z" }
+{ "type": "status", "data": "session offline", "ts": "..." }
+{ "type": "error",  "data": "<error message>", "ts": "..." }
+```
+
+**Client → server (keyboard input):**
+```json
+{ "type": "input", "data": "<keystrokes>" }
+```
+The server calls `tmux send-keys -t kaggle-agent <data>` — no newline is
+appended automatically. To submit a command, include `\n` in the data string.
+
+Note: the `/terminal/ws` path is a WebSocket endpoint. A plain HTTP GET to
+it will return 404 from FastAPI — this is expected behaviour. Connect via
+the WebSocket protocol (`ws://` or `wss://`).
+
+---
+
+### Other endpoints — same shapes as PRD §10
+
+| Method | Path | Notes |
+|---|---|---|
+| GET  | `/system/ssh-info` | tailscale hostname, ssh + tmux attach commands |
 | GET  | `/competitions` | falls back to local registry.json if Postgres has no rows |
 | GET  | `/competitions/active` | reads `competitions/registry.json` for the active slug |
 | GET  | `/competitions/active/trajectory` | 404 if no active competition |
@@ -175,49 +210,26 @@ SIGCONT (in case it was paused) → SIGTERM → 1 second grace → SIGKILL →
 | POST | `/competitions/switch` | body: `{slug}` |
 | GET  | `/experiments?competition=<slug>&limit=50` | rows from `kaggle_experiments` |
 | GET  | `/submissions?competition=<slug>` | rows from `kaggle_submissions` |
-| GET  | `/leaderboard/{slug}` | shells out to the Kaggle CLI; needs `KAGGLE_KEY` + `KAGGLE_USERNAME` in env |
+| GET  | `/leaderboard/{slug}` | shells out to Kaggle CLI |
 | GET  | `/logs?lines=200` | tails every `logs/*.log` |
-| GET  | `/chat/messages?limit=50` | recent messages (oldest first) |
-| POST | `/chat/send` | body: `{text}` — also forwards to Telegram as `[web] <text>` |
-
-### Streaming endpoints
-
-| Endpoint | Protocol | Cadence |
-|---|---|---|
-| `GET /gpu/stream` | Server-Sent Events (`text/event-stream`) | snapshot every 3 s |
-| `WS  /chat/ws` | WebSocket — JSON messages | initial dump of last 50, then live |
-| `WS  /terminal/ws` | WebSocket — JSON messages | tmux pane output every 500 ms |
-
-WebSocket client framing:
-- **Chat** (`/chat/ws`): incoming events from server look like
-  `{ "id": ..., "role": "agent"|"human", "source": "telegram"|"web"|"agent",
-  "text": ..., "status": ..., "ask_id": ..., "created_at": ... }`. Outgoing
-  client messages must be `{"text": "..."}`. Server replies with
-  `{"ack": "<msg_id>"}` after persisting.
-- **Terminal** (`/terminal/ws`): server sends `{"type": "output"|"status"|"error",
-  "data": "...", "ts": "..."}` every 500 ms. `type: "output"` contains the
-  tmux pane content; `type: "status"` with `data: "session offline"` means
-  the tmux session doesn't exist.
+| GET  | `/gpu/stream` | Server-Sent Events, GPU snapshot every 3 s |
+| GET  | `/ollama/status` | `{ok, models}` |
+| GET  | `/memory/status` | Postgres/Qdrant/MCP/Tailscale latency and status |
 
 ---
 
 ## Standalone kaggle-ui repository spec
 
-**Repository:** separate Next.js 14+ App Router project deploying to Vercel  
-**Production URL:** `https://kaggle-ui.nnaq.net`  
-**Design:** black and white monospace throughout (e.g., IBM Plex Mono, Roboto Mono, or JetBrains Mono)  
+**Repository:** separate Next.js 14+ App Router project deploying to Vercel
+**Production URL:** `https://kaggle-ui.nnaq.net`
+**Design:** black and white monospace throughout (IBM Plex Mono, Roboto Mono, or JetBrains Mono)
 **Terminal:** xterm.js for the `/terminal` page, full-screen black background with white text
 
 ### Environment variables (Vercel)
 
 ```bash
-# API base URL (HTTP for REST endpoints)
 NEXT_PUBLIC_KAGGLE_API_URL=https://kaggle-ui.nnaq.net
-
-# WebSocket base URL (wss:// for production, ws:// for local dev)
 NEXT_PUBLIC_KAGGLE_WS_URL=wss://kaggle-ui.nnaq.net
-
-# Simple password middleware (server-side)
 PASSWORD=your-secure-password-here
 ```
 
@@ -235,58 +247,88 @@ centered password prompt (black background, white monospace input). Store the
 password in a secure httpOnly cookie after validation. Middleware checks the
 cookie on every request. No user accounts, no database — single shared password.
 
-Example route structure:
-- `/login` — password form
-- `middleware.ts` — validates cookie, redirects to `/login` if missing/invalid
-- All other routes protected
-
 ### Pages
 
 | Route | Purpose |
 |-------|---------|
-| `/` or `/dashboard` | Overview: system state, active competition, GPU snapshot, recent experiments summary, quick links |
-| `/terminal` | Full-screen xterm.js terminal connected to `WS /terminal/ws`, auto-reconnect on disconnect |
+| `/` or `/dashboard` | Overview: system state with run-stage progress banner, active competition, GPU snapshot, quick controls (Pause/Resume/Stop/Checkpoint), model selector |
+| `/terminal` | Full-screen xterm.js terminal connected to `WS /terminal/ws`, sends keystrokes back to tmux, auto-reconnect |
 | `/chat` | Chat interface connected to `WS /chat/ws`, message history, send box at bottom |
-| `/experiments` | Table of experiments from `GET /experiments`, filterable by competition, sortable by CV score |
-| `/gpu` | Real-time GPU monitor connected to `GET /gpu/stream` (SSE), live charts for VRAM/util/temp/power |
-| `/competitions` | List from `GET /competitions`, show active, switch competition via `POST /competitions/switch` |
-| `/logs` | Tail of agent logs from `GET /logs?lines=200`, auto-refresh every 5 s or live SSE if available |
-| `/submissions` | Table from `GET /submissions`, show submission history per competition |
-| `/leaderboard` | Fetch from `GET /leaderboard/{slug}`, display raw output or parse into table |
-| `/memory` | Memory stack status from `GET /memory/status`, show Postgres/Qdrant/MCP/Tailscale health and latency |
+| `/experiments` | Table from `GET /experiments`, filterable by competition, sortable by CV score |
+| `/gpu` | Real-time GPU monitor from `GET /gpu/stream` (SSE), live charts |
+| `/competitions` | List from `GET /competitions`, show active, switch via `POST /competitions/switch` |
+| `/logs` | Tail of agent logs from `GET /logs?lines=200`, auto-refresh every 5 s |
+| `/submissions` | Table from `GET /submissions`, history per competition |
+| `/leaderboard` | From `GET /leaderboard/{slug}` |
+| `/memory` | Memory stack status from `GET /memory/status` |
+| `/settings` | Model selector (GET/POST `/system/model`), API info |
 
-### WebSocket and SSE endpoints for UI
+### Dashboard — run stage banner
 
-| Endpoint | Production URL | Protocol |
-|----------|---------------|----------|
-| Health polling | `https://kaggle-ui.nnaq.net/health` | HTTP GET |
-| GPU stream | `https://kaggle-ui.nnaq.net/gpu/stream` | Server-Sent Events |
-| Chat WebSocket | `wss://kaggle-ui.nnaq.net/chat/ws` | WebSocket |
-| Terminal WebSocket | `wss://kaggle-ui.nnaq.net/terminal/ws` | WebSocket |
+Poll `GET /system/state` every 5 s. When `state == "running"` and
+`run_stage` is present and not `idle`/`done`, show a banner:
 
-All other endpoints are HTTP GET/POST to `NEXT_PUBLIC_KAGGLE_API_URL`.
+```
+🏋 Training  epoch 14/50  ~14m left       [Checkpoint]
+```
+
+Clear the banner when `run_stage` is absent, `idle`, or `done`, or when
+state is not `running`. The `[Checkpoint]` button calls `POST /system/checkpoint`.
+
+### Dashboard — controls
+
+| Button | API call | Enabled when |
+|---|---|---|
+| Pause | POST /system/pause | state == running |
+| Resume | POST /system/resume | state == paused or stopped |
+| Stop | POST /system/stop | state == running or paused |
+| Checkpoint | POST /system/checkpoint | state == running and run_stage not idle |
+
+Show confirmation dialog before Stop (destructive — kills Claude Code session).
+Optimistic UI: set badge to "transitioning" immediately on click.
+
+### Terminal page implementation
+
+Use xterm.js with `fit` addon:
+1. Connect to `WS /terminal/ws`
+2. On `type: "output"` frames: call `terminal.write(data)` — the pane content
+   includes ANSI escape codes since tmux is captured with `-e`
+3. On `type: "status"` with `data: "session offline"`: show an overlay banner
+4. On `type: "error"`: log to console, show brief toast
+5. On user keystrokes: send `{"type": "input", "data": event.key}` back to server
+6. Auto-reconnect with exponential backoff (1 s, 2 s, 4 s, 8 s max)
+
+### Model selector UI
+
+Dropdown or radio group showing:
+- Haiku 4.5 · fast/cheap
+- Sonnet 4.6 · balanced ← default
+- Opus 4.7 · powerful
+
+After selecting: call `POST /system/model`, then show a dismissable notice
+"Model updated — stop and resume the agent to apply."
 
 ### Design guidelines
 
 - **Typography:** monospace only (IBM Plex Mono, Roboto Mono, or JetBrains Mono)
-- **Colors:** pure black (#000) background, pure white (#FFF) text, gray (#666, #999) for secondary text
-- **Layout:** sidebar nav on left (fixed width ~200px), main content area on right
+- **Colors:** pure black (#000) background, pure white (#FFF) text, gray (#666, #999) for secondary
+- **Layout:** sidebar nav on left (~200px fixed), main content area on right
 - **Tables:** simple borders, alternating row backgrounds (#111 vs #000), sortable columns
-- **Terminal:** xterm.js full-screen, black bg, white text, 80x24 default, fit-addon to resize
-- **Charts (GPU page):** lightweight canvas-based (e.g., Chart.js with dark theme) or plain ASCII charts
-- **Status indicators:** colored dots (green/yellow/red) for online/degraded/offline, but keep text labels
-- **Buttons:** simple bordered rectangles, white border, white text, hover inverts to black bg + white text
-- **No animations** except for loading spinners (simple CSS keyframes)
+- **Terminal:** xterm.js full-screen, black bg, white text, 80×24 default, fit-addon to resize
+- **Charts (GPU page):** Chart.js dark theme or plain ASCII charts
+- **Status indicators:** colored dots (green/yellow/red/gray/blue) matching tray app colours
+- **Buttons:** simple bordered rectangles, white border, white text, hover inverts
+- **No animations** except loading spinners (simple CSS keyframes)
 
 ### Key implementation notes
 
-1. **Poll `/health` every 10 s** (3 s timeout) to drive the global status indicator in the sidebar.
-2. **Auto-reconnect WebSockets** on disconnect with exponential backoff (1s, 2s, 4s, 8s max).
-3. **Terminal page**: use xterm.js with `fit` addon, connect to `/terminal/ws`, parse `type: "output"` and write to terminal, show "session offline" banner if `type: "status"`.
-4. **Chat page**: initial history dump on connect, append new messages as they arrive, auto-scroll to bottom.
-5. **GPU page**: use SSE `EventSource`, parse `data:` lines as JSON, update charts live.
-6. **Experiments/Submissions tables**: client-side sort, filter by competition dropdown, highlight best CV score.
-7. **Memory page**: show latency bar charts for Postgres/Qdrant/MCP, Qdrant collection vector counts, Tailscale connection status.
+1. **Poll `/health` every 10 s** (3 s timeout) to drive global status indicator in sidebar.
+2. **Poll `/system/state` every 5 s** separately — lighter than health, needed for run-stage banner.
+3. **Auto-reconnect WebSockets** with exponential backoff (1s → 2s → 4s → 8s max).
+4. **Terminal xterm.js:** use `terminal.write()` not `terminal.writeln()` — tmux output already has `\r\n`.
+5. **Chat page:** initial history dump on connect, append new messages as they arrive, auto-scroll to bottom.
+6. **GPU page:** use `EventSource`, parse `data:` lines as JSON, update charts live.
+7. **"Got it, thinking..."** messages arrive as `role: "agent", source: "system"` — render with a distinct style (e.g., italic gray) to distinguish from real agent responses.
 
 ### Deploy to Vercel
 
@@ -297,23 +339,19 @@ vercel env add PASSWORD
 vercel --prod
 ```
 
-Custom domain `kaggle-ui.nnaq.net` must point to the Vercel deployment. The API
-backend (`http://kaggle:8765` on Tailscale or Cloudflare Tunnel) handles CORS
-for `https://*.vercel.app` and `https://kaggle-ui.nnaq.net`.
+Custom domain `kaggle-ui.nnaq.net` → Vercel. API backend (`http://kaggle:8765` on Tailscale
+or Cloudflare Tunnel) has CORS for `https://*.vercel.app` and `https://kaggle-ui.nnaq.net`.
 
 ---
 
 ## Memory stack (Tailscale VM 'docker')
 
-The Kaggle agent connects to a separate Tailscale VM named `docker` that hosts:
-
 | Service | Port | Purpose |
 |---------|------|---------|
-| PostgreSQL | 5432 | `claude_memory` database with tables: `kaggle_competitions`, `kaggle_experiments`, `kaggle_features`, `kaggle_submissions`, `kaggle_datasets` |
-| Qdrant | 6333 | Vector collections: `kaggle_features`, `kaggle_experiments`, `kaggle_insights`, `kaggle_errors`, `claude_memory` |
-| MCP server | 8000 | Memory MCP server with bearer token auth (`MCP_BEARER_TOKEN` in `.env`) |
+| PostgreSQL | 5432 | `claude_memory` database with kaggle_* tables |
+| Qdrant | 6333 | Vector collections: kaggle_features, kaggle_experiments, kaggle_insights, kaggle_errors, claude_memory |
+| MCP server | 8000 | Memory MCP server with bearer token auth |
 
-All connection details are in `.env`:
 ```bash
 TAILSCALE_MEMORY_HOST=docker
 POSTGRES_DSN=postgresql://claude:PASSWORD@docker:5432/claude_memory
@@ -322,20 +360,109 @@ MCP_URL=http://docker:8000
 MCP_BEARER_TOKEN=...
 ```
 
-The agent uses `core/memory.py` to interact with the stack. If the stack goes
-offline, the agent continues working with degraded functionality (no memory
-persistence). The web UI `/memory` page shows real-time status.
-
 ---
 
 ## Confirmed SSH commands
-On any device on the same Tailscale tailnet:
 ```bash
 ssh keehar@kaggle
 ssh keehar@kaggle -t tmux attach -t kaggle-agent
 ```
-Tailscale SSH is enabled (`tailscale up --ssh`). The `kaggle-agent` tmux
-session is created by `scripts/wsl_startup.sh` at WSL boot.
+
+---
+
+## Windows tray app (Phase 6)
+
+Native Windows app in `tray/`. **Run `tray/start_tray.bat`** — now uses
+`tray_launcher.py` which watches `kaggle_tray.py` for saves and auto-restarts
+the tray. No manual restart needed after code changes.
+
+**Icon colours:**
+
+| Colour | Meaning |
+|---|---|
+| 🟢 green | running |
+| 🟡 yellow | paused |
+| ⚪ gray | stopped |
+| 🔵 blue | transitioning |
+| 🔴 red | API unreachable |
+
+**Tooltip when running** shows the run stage and ETA:
+```
+Kaggle Agent — running  (titanic)
+🏋 Training epoch 14/50, ~14m left
+```
+
+**Menu:**
+- Status label with run-stage badge
+- Pause / Stop / Resume
+- Open Dashboard (browser)
+- Open tmux session (opens Windows Terminal or cmd with `wsl tmux attach`)
+- **Model** submenu — radio checkmarks for Haiku/Sonnet/Opus; calls `POST /system/model`
+- **Start on startup** — checked checkbox; toggles the `"Kaggle Agent"` Task Scheduler task via `schtasks`
+- Quit tray
+
+**Task Scheduler task** (`"Kaggle Agent"`): runs at logon, executes
+`wsl.exe -d Ubuntu-24.04 -- bash /home/keehar/kaggle-agent/scripts/wsl_startup.sh`.
+
+**Auto-restart:** `tray_launcher.py` polls `kaggle_tray.py` mtime every 2 s.
+On file change: terminates the old tray process, starts a new one. This means
+editing and saving `kaggle_tray.py` on the Windows side is enough — the tray
+picks up the change within ~3 s.
+
+---
+
+## Backend auto-restart on code changes (Phase 6)
+
+`systemd/kaggle-api-watch.service` runs `scripts/watch_backend.sh`. This
+script uses `inotifywait` to watch `api/` and `core/` for `.py` file changes.
+On change: 1 s debounce, then `systemctl restart kaggle-api`. Installed and
+enabled by the deploy commands; starts automatically at boot.
+
+To verify it's running:
+```bash
+sudo systemctl status kaggle-api-watch
+```
+
+inotify-tools (`inotifywait`) must be installed: `sudo apt-get install -y inotify-tools`.
+Already confirmed installed on this machine.
+
+---
+
+## Startup flow (Phase 6)
+
+`scripts/wsl_startup.sh` is designed to run **headlessly** — all output goes
+to `logs/startup.log`. The WSL terminal window started by Task Scheduler can
+be closed immediately; all processes run in detached tmux or systemd services.
+
+Flow:
+1. Tailscale up (idempotent)
+2. `systemctl start telegram-bot kaggle-api mlflow ollama`
+3. 5 s wait → `POST /system/resume` (sets state = running)
+4. `tmux new-session -d -s kaggle-agent` running `scripts/start_agent.sh`
+5. `systemctl start kaggle-api-watch`
+
+The agent session is a detached tmux session — closing any terminal window
+has no effect. Access it at any time via the tray's "Open tmux session" or:
+```bash
+wsl -d Ubuntu-24.04 -e bash -c "tmux attach -t kaggle-agent"
+```
+
+---
+
+## Model selection (Phase 6)
+
+Agent model is stored in `.claude/kaggle_settings.json`:
+```json
+{ "model": "claude-sonnet-4-6" }
+```
+
+`scripts/start_agent.sh` reads this and passes `--model <id>` to `claude`.
+Change via:
+- Tray → Model submenu
+- `POST /system/model {"model": "claude-opus-4-7"}`
+- Direct edit of `.claude/kaggle_settings.json`
+
+Then Stop + Resume the agent session to apply.
 
 ---
 
@@ -343,17 +470,16 @@ session is created by `scripts/wsl_startup.sh` at WSL boot.
 
 | What | PRD | Built |
 |---|---|---|
-| `TRAINING_MIN_FREE_MB` | 9500 | **9000** — Windows reserves ~3 GB on this WSL2 install rather than the PRD's assumed 1.5 GB, so post-Ollama-stop free is ~9.2 GB. |
-| Ollama install location | `/usr/local/bin/ollama` (via the Ollama install script) | `~/.local/bin/ollama → ~/.local/lib/ollama/bin/ollama` — the install script wants broad sudo we don't grant. systemd unit points at the user-local path. |
-| Cloudflare Tunnel | configured during Phase 4 | **Deferred** — `cloudflared.deb` is in the repo but `cloudflared tunnel login` is an interactive browser flow. See *Known issues / TODOs*. |
-| `huggingface_hub` API | `list_datasets(tags=...)` | `list_datasets(filter=...)` — `tags` was renamed in 1.x. The signature of `core.hf_search.search_relevant_datasets(query, tags=...)` is unchanged. |
-| `competitions/registry.json` | starts empty | Same — initialised to `{"active": null, "competitions": {}}`. |
+| `TRAINING_MIN_FREE_MB` | 9500 | **9000** — Windows reserves ~3 GB on this WSL2 install |
+| Ollama install location | `/usr/local/bin/ollama` | `~/.local/bin/ollama` |
+| Cloudflare Tunnel | configured Phase 4 | **Deferred** |
+| `huggingface_hub` API | `list_datasets(tags=...)` | `list_datasets(filter=...)` |
 
 ---
 
 ## Known issues / TODOs
 
-1. **Cloudflare Tunnel not yet wired up.** Run once on this box:
+1. **Cloudflare Tunnel not yet wired up.** Run once:
    ```bash
    sudo dpkg -i cloudflared.deb
    cloudflared tunnel login
@@ -361,106 +487,33 @@ session is created by `scripts/wsl_startup.sh` at WSL boot.
    cloudflared tunnel route dns kaggle kaggle.<your-domain>
    sudo cloudflared service install
    ```
-   Then update `.env`:
-   ```
-   CLOUDFLARE_TUNNEL_URL=https://kaggle.<your-domain>
-   ALLOWED_ORIGINS=https://<your-agency-platform-host>
-   ```
-   and `sudo systemctl restart kaggle-api`.
 
-2. **Kaggle auth:** `.env` must have `KAGGLE_KEY` and `KAGGLE_USERNAME`.
-   The Kaggle Python library requires these exact variable names. Never use
-   `kaggle.json` — environment variables only.
+2. **Kaggle auth:** `.env` must have `KAGGLE_KEY` and `KAGGLE_USERNAME`. Never use `kaggle.json`.
 
-3. **`pynvml` deprecation warning.** Cosmetic — package functions are
-   identical to `nvidia-ml-py`. Suppress with
-   `PYTHONWARNINGS=ignore::FutureWarning` if it's noisy in logs.
+3. **`pynvml` deprecation warning.** Cosmetic — suppress with `PYTHONWARNINGS=ignore::FutureWarning`.
 
-4. **Per-competition CLAUDE.md is a stub.** `competition_manager.py new`
-   writes a 4-line file. The agent should expand it once a competition
-   is registered (target column, evaluation metric details, EDA notes).
+4. **Task Scheduler "Kaggle Agent" task** was created with admin rights; the tray app can toggle
+   it enabled/disabled but cannot recreate it from scratch without admin PowerShell.
 
-5. **HF dataset enrichment requires explicit join keys.** The `enrich`
-   stage is a no-op if `hf_dataset_ids` is empty — by design — but it
-   also does nothing if your join keys aren't present in both sides. We
-   don't auto-discover them.
+5. **MLflow served on `127.0.0.1:5000`** — not exposed via API. Add a proxy if needed.
 
-6. **MLflow served on `127.0.0.1:5000`** (not exposed via the API).
-   Add a reverse-proxy endpoint or a separate Cloudflare hostname if you
-   want to browse runs from the web UI directly.
+6. **Per-competition CLAUDE.md is a stub.** Agent should expand it after registration.
 
 ---
 
-## Web UI work needed (Session 2)
-
-The `/system/*` endpoints exist server-side; the agency-platform UI still
-needs to surface them:
-
-1. **Sidebar state badge** — next to the existing health status dot, render
-   a small badge showing the lifecycle state from `GET /system/state`:
-   `Running` (green), `Paused` (yellow), `Stopped` (gray). When the dot is
-   already red (API offline) the badge is hidden.
-2. **Dashboard buttons** — `Pause`, `Resume`, `Stop`. Enabled state mirrors
-   the tray app:
-   - Pause: enabled only when state is `running`
-   - Stop: enabled when `running` or `paused`
-   - Resume: enabled when `paused` or `stopped`
-3. **Confirmation dialog on Stop** — Stop is destructive (kills the
-   Claude Code tmux session and any active training). Prompt before POST.
-4. **Optimistic UI** — set the badge to a transitioning style as soon as
-   the user clicks; reconcile when the response arrives.
-5. **Polling** — bump `/system/state` polling cadence to match the
-   existing 10 s `/health` poll, or piggyback on a single combined call.
-
-## Windows tray app
-
-A native Windows tray app lives in `tray/` and exposes the same controls
-without opening the browser. Install once on Windows (not WSL2):
-
-```
-pip install pystray pillow requests
-```
-
-Run by double-clicking `tray/start_tray.bat` (uses `pythonw` so no console
-window appears).
-
-Auto-start on login: drop a shortcut to `tray/start_tray.bat` into
-`shell:startup`, or create a Task Scheduler entry "At log on" pointing at
-`pythonw kaggle_tray.py`. Full instructions in `tray/README.md`.
-
-The icon is a bold "K" on a coloured rounded square:
-
-| Colour | Meaning |
-|---|---|
-| 🟢 green | running |
-| 🟡 yellow | paused |
-| ⚪ gray | stopped |
-| 🔵 blue | transitioning (request in flight) |
-| 🔴 red | API unreachable |
-
-The tray polls `GET /system/state` every 5 s. The dashboard URL it opens
-is hard-coded to `https://kaggle.nnaq.net`; change `DASHBOARD_URL` at the
-top of `kaggle_tray.py` if the Cloudflare host differs.
-
-## How to start the agent
-```bash
-cd ~/kaggle-agent
-bash scripts/start_agent.sh        # runs Claude Code in this terminal
-# or, for the daemonised path:
-bash scripts/wsl_startup.sh        # creates tmux session 'kaggle-agent'
-tmux attach -t kaggle-agent
-```
-
-The agent reads `CLAUDE.md` for instructions, queries the MCP at
-`http://docker:8000` for context, and calls
-`core.message_bus.get_pending_instructions()` at the top of each loop
-iteration so you can redirect it from Telegram or the web chat at any time.
-
-## Quick smoke test from a fresh shell
+## Quick smoke test
 ```bash
 curl -sS http://localhost:8765/health   | jq .status
-curl -sS http://localhost:8765/memory/status | jq '{pg:.postgres.status,qd:.qdrant.status,mcp:.mcp.status}'
+curl -sS http://localhost:8765/system/state | jq .
+curl -sS http://localhost:8765/system/model | jq .
 python core/notify.py "handoff smoke test"
 ```
 
-If those three commands all succeed, the agent is fully wired up.
+## How to start the agent
+```bash
+# Attach to the running tmux session:
+tmux attach -t kaggle-agent
+
+# Or start fresh:
+bash scripts/wsl_startup.sh
+```

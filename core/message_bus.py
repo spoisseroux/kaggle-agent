@@ -18,10 +18,13 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+
+_AGENT_SESSION = "kaggle-agent"
 
 DB_PATH = Path(os.environ.get(
     "KAGGLE_MESSAGE_BUS_DB",
@@ -173,6 +176,30 @@ def list_recent(limit: int = 50) -> list[dict]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def wake_agent(message_text: str) -> bool:
+    """Forward a human message to Claude Code's stdin via tmux send-keys.
+
+    Needed because Claude Code waits on stdin (the tmux terminal) between tasks,
+    so messages that land in the message_bus SQLite are invisible until the agent
+    manually polls get_pending_instructions(). Sending the text via tmux
+    delivers it to Claude's input immediately.
+    """
+    try:
+        r = subprocess.run(
+            ["tmux", "has-session", "-t", _AGENT_SESSION],
+            capture_output=True, timeout=2,
+        )
+        if r.returncode != 0:
+            return False
+        subprocess.run(
+            ["tmux", "send-keys", "-t", _AGENT_SESSION, message_text, "Enter"],
+            capture_output=True, timeout=3,
+        )
+        return True
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

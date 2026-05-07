@@ -37,6 +37,15 @@ from core.notify import send_telegram  # noqa: E402
 API_VERSION = "0.1.0"
 START_TIME = dt.datetime.utcnow()
 
+# Settings file for agent-specific config (model selection etc.)
+KAGGLE_SETTINGS_PATH = REPO_ROOT / ".claude" / "kaggle_settings.json"
+
+AVAILABLE_MODELS = [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7",
+]
+
 app = FastAPI(title="Kaggle Agent API", version=API_VERSION)
 
 origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
@@ -92,6 +101,29 @@ def _trend_slope(values: list[float]) -> float | None:
     return num / den
 
 
+def _read_kaggle_settings() -> dict:
+    if not KAGGLE_SETTINGS_PATH.exists():
+        return {}
+    try:
+        return json.loads(KAGGLE_SETTINGS_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def _write_kaggle_settings(data: dict) -> None:
+    KAGGLE_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    KAGGLE_SETTINGS_PATH.write_text(json.dumps(data, indent=2))
+
+
+def _post_ack() -> None:
+    """Post an immediate acknowledgment before the agent has time to respond."""
+    message_bus.post_agent_message("Got it, thinking...", source="system", status="delivered")
+    try:
+        send_telegram("Got it, thinking...")
+    except Exception:
+        pass
+
+
 # ---------- health ----------
 
 @app.get("/health")
@@ -130,7 +162,8 @@ def health() -> dict:
 @app.get("/system/state")
 def system_state() -> dict:
     s = system_control.get_state()
-    return {**s, "active_competition": _active_slug()}
+    run_stage = system_control.get_run_stage()
+    return {**s, **run_stage, "active_competition": _active_slug()}
 
 
 @app.post("/system/pause")
@@ -163,6 +196,15 @@ def system_stop() -> dict:
     return {**result, "active_competition": _active_slug()}
 
 
+@app.post("/system/checkpoint")
+def system_checkpoint() -> dict:
+    """Signal the agent to save mid-run state before stopping."""
+    result = system_control.checkpoint()
+    # Also wake the agent so it notices the checkpoint request quickly
+    message_bus.wake_agent("checkpoint requested — please save state now")
+    return {**result, "active_competition": _active_slug()}
+
+
 @app.get("/system/ssh-info")
 def ssh_info() -> dict:
     host = os.environ.get("TAILSCALE_HOSTNAME", "kaggle")
@@ -181,6 +223,33 @@ def ssh_info() -> dict:
         "ssh_command": f"ssh {user}@{host}",
         "tmux_command": f"ssh {user}@{host} -t tmux attach -t kaggle-agent",
         "tailscale_connected": connected,
+    }
+
+
+# ---------- model selection ----------
+
+@app.get("/system/model")
+def get_model() -> dict:
+    settings = _read_kaggle_settings()
+    current = settings.get("model", "claude-sonnet-4-6")
+    return {"model": current, "available": AVAILABLE_MODELS}
+
+
+class ModelUpdate(BaseModel):
+    model: str
+
+
+@app.post("/system/model")
+def set_model(body: ModelUpdate) -> dict:
+    if body.model not in AVAILABLE_MODELS:
+        raise HTTPException(400, f"unknown model; available: {AVAILABLE_MODELS}")
+    settings = _read_kaggle_settings()
+    settings["model"] = body.model
+    _write_kaggle_settings(settings)
+    return {
+        "model": body.model,
+        "restart_required": True,
+        "note": "Model takes effect when the agent session restarts (stop + resume)",
     }
 
 
@@ -341,7 +410,11 @@ def chat_send(body: ChatMessage) -> dict:
     if not text:
         raise HTTPException(400, "empty text")
     msg_id = message_bus.post_human_message(text, source="web")
-    # forward to telegram so phone stays in sync
+    # Immediate ack so the user knows it landed before the agent responds
+    _post_ack()
+    # Wake Claude Code's stdin so it processes the message now
+    message_bus.wake_agent(text)
+    # Forward to telegram so phone stays in sync
     try:
         send_telegram(f"[web] {text}")
     except Exception:
@@ -366,6 +439,10 @@ async def chat_ws(ws: WebSocket) -> None:
                 text = (data.get("text") or "").strip()
                 if text:
                     msg_id = message_bus.post_human_message(text, source="web")
+                    # Immediate ack + wake
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(None, _post_ack)
+                    await loop.run_in_executor(None, message_bus.wake_agent, text)
                     try:
                         send_telegram(f"[web] {text}")
                     except Exception:
@@ -384,10 +461,27 @@ async def chat_ws(ws: WebSocket) -> None:
 
 @app.websocket("/terminal/ws")
 async def terminal_ws(ws: WebSocket) -> None:
-    """Stream live tmux pane output every 500ms."""
+    """Stream live tmux pane output; relay client keystrokes into the pane."""
     await ws.accept()
     try:
         while True:
+            # Poll for output and handle any pending input concurrently
+            try:
+                client_payload = await asyncio.wait_for(ws.receive_text(), timeout=0.5)
+                data = json.loads(client_payload)
+                if data.get("type") == "input":
+                    keys = data.get("data", "")
+                    if keys:
+                        subprocess.run(
+                            ["tmux", "send-keys", "-t", "kaggle-agent", keys],
+                            capture_output=True, timeout=2,
+                        )
+            except asyncio.TimeoutError:
+                pass
+            except WebSocketDisconnect:
+                return
+
+            # Capture and send current pane output
             try:
                 r = subprocess.run(
                     ["tmux", "capture-pane", "-p", "-t", "kaggle-agent", "-e"],
@@ -411,7 +505,6 @@ async def terminal_ws(ws: WebSocket) -> None:
                     "data": str(e),
                     "ts": dt.datetime.utcnow().isoformat() + "Z"
                 }))
-            await asyncio.sleep(0.5)
     except WebSocketDisconnect:
         return
 

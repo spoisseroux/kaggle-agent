@@ -12,6 +12,7 @@ stay alive so the user can resume from anywhere.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import logging
 import os
@@ -38,9 +39,16 @@ def _read_state_file() -> dict:
         return {"state": "running", "since": time.time()}
 
 
-def _write_state_file(state: str) -> dict:
-    payload = {"state": state, "since": time.time()}
-    STATE_PATH.write_text(json.dumps(payload))
+def _write_state_file(state: str, extra: dict | None = None) -> dict:
+    existing = _read_state_file()
+    payload: dict = {"state": state, "since": time.time()}
+    # Preserve run_stage fields across state transitions
+    for k in ("run_stage", "run_stage_detail", "run_eta_seconds", "run_started_at"):
+        if k in existing:
+            payload[k] = existing[k]
+    if extra:
+        payload.update(extra)
+    STATE_PATH.write_text(json.dumps(payload, default=str))
     return payload
 
 
@@ -170,6 +178,54 @@ def _ollama_start() -> None:
 
 
 # ---------- public API ----------
+
+def set_run_stage(
+    stage: str,
+    detail: str | None = None,
+    eta_seconds: int | None = None,
+) -> dict:
+    """Called by the agent to report training/pipeline progress."""
+    s = _read_state_file()
+    s["run_stage"] = stage
+    if detail is not None:
+        s["run_stage_detail"] = detail
+    elif "run_stage_detail" in s:
+        del s["run_stage_detail"]
+    if eta_seconds is not None:
+        s["run_eta_seconds"] = eta_seconds
+    elif "run_eta_seconds" in s:
+        del s["run_eta_seconds"]
+    if stage not in ("idle", "done") and "run_started_at" not in s:
+        s["run_started_at"] = dt.datetime.utcnow().isoformat() + "Z"
+    if stage in ("idle", "done"):
+        for k in ("run_started_at", "run_eta_seconds", "run_stage_detail"):
+            s.pop(k, None)
+    s.pop("checkpoint_requested", None)
+    STATE_PATH.write_text(json.dumps(s, default=str))
+    return s
+
+
+def get_run_stage() -> dict:
+    s = _read_state_file()
+    keys = ("run_stage", "run_stage_detail", "run_eta_seconds", "run_started_at")
+    return {k: s[k] for k in keys if k in s}
+
+
+def checkpoint() -> dict:
+    """Signal the agent to save mid-run state before stopping."""
+    s = _read_state_file()
+    s["checkpoint_requested"] = True
+    s["checkpoint_requested_at"] = dt.datetime.utcnow().isoformat() + "Z"
+    STATE_PATH.write_text(json.dumps(s, default=str))
+    return s
+
+
+def clear_checkpoint() -> None:
+    s = _read_state_file()
+    s.pop("checkpoint_requested", None)
+    s.pop("checkpoint_requested_at", None)
+    STATE_PATH.write_text(json.dumps(s, default=str))
+
 
 def get_state() -> dict:
     """Return persisted state, reconciling with reality.

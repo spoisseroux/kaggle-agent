@@ -19,7 +19,25 @@ except Exception:
 PY
 )
 
+# Read the Claude model from .claude/kaggle_settings.json (set via tray or web UI)
+MODEL=$(python - <<'PY'
+import json, pathlib
+try:
+    p = pathlib.Path('.claude/kaggle_settings.json')
+    m = json.loads(p.read_text()).get('model', '')
+    print(m)
+except Exception:
+    print('')
+PY
+)
+
+MODEL_FLAG=()
+if [ -n "$MODEL" ]; then
+    MODEL_FLAG=(--model "$MODEL")
+fi
+
 exec claude \
+  "${MODEL_FLAG[@]}" \
   --dangerously-skip-permissions \
   --mcp-config .claude/mcp_config.json \
   -- \

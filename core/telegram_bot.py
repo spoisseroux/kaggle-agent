@@ -20,7 +20,8 @@ _load_env()
 from telegram import Update  # noqa: E402
 from telegram.ext import Application, MessageHandler, filters, ContextTypes  # noqa: E402
 
-from core.message_bus import init_db, post_human_message  # noqa: E402
+from core.message_bus import init_db, post_human_message, wake_agent  # noqa: E402
+from core.notify import send_telegram  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,14 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     msg_id = post_human_message(text, source="telegram")
     log.info("ingested telegram message %s (%d chars)", msg_id, len(text))
+    # Immediate ack before the agent has time to respond
+    try:
+        send_telegram("Got it, thinking...")
+    except Exception:
+        pass
+    # Wake Claude Code's stdin so it processes the message without waiting for
+    # the next natural loop iteration
+    wake_agent(text)
 
 
 def main() -> int:
