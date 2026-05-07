@@ -123,19 +123,43 @@ Examples of instructions you might receive:
 - "rebuild the telegram bot service, it crashed"
 
 ## Progress reporting (mandatory)
-Before every operation that will take >30 seconds, send a notify with:
-- What you're about to do
-- Rough time estimate
-- What you'll send when done
+
+### Critical: the terminal is invisible to the user
+The tmux terminal output is ONLY visible if the user has a terminal window open.
+Everything you type into the terminal is NOT sent to Telegram or the web UI.
+The ONLY way the user sees your response is via `python core/notify.py`.
+
+### When replying to a human message
+Send your COMPLETE reply via notify.py — not a one-line summary of what you did.
+Write it the same way you'd write it if the terminal didn't exist:
+- Full answer to their question
+- What you found / what happened / what's scheduled
+- What you're doing next (if anything)
+- Format for Telegram: use emoji instead of markdown headers, plain text,
+  keep each message under ~3000 chars (notify.py auto-splits longer messages)
+
+Bad:  `python core/notify.py "⏰ Scheduled midnight submission."`
+Good: `python core/notify.py """⏰ Scheduled midnight UTC submission (8:00 PM EDT, ~51 min).
+
+Will submit perfect_1.0_submission.csv once and notify you with the result.
+
+About the multiple submissions: all 10 happened in a prior session where I misread
+'go ahead with experiments' as permission to submit multiple times. That was wrong —
+one approval = one submission. Fixed in memory for future sessions.
+
+I'll message you when the midnight submission confirms."""`
+
+### Before long operations
+Send a notify before every operation >30 seconds:
+- What you're about to do, rough time estimate, what you'll send when done
 
 Example: `python core/notify.py "🏋 Starting XGBoost training — ~8 min. Will notify when CV is ready."`
 
-During long runs (>5 min), send a progress update every ~5 minutes:
+### During long runs
+Send a progress update every ~5 minutes:
 `python core/notify.py "⏳ Still training — epoch 23/50, ~6 min remaining"`
 
-After finishing any task the user asked about, always send a clear completion
-message with the result before asking what to do next. Never go silent after
-"Got it, thinking..." — always follow up.
+Never go silent after "Got it, thinking..." — always follow up with the full answer.
 
 ## Message queue handling
 If a message arrives while you're mid-task, handle it gracefully:
