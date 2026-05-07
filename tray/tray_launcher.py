@@ -83,9 +83,15 @@ def main() -> None:
             print(f"Restarted tray pid={proc.pid}", flush=True)
             continue
 
-        # Check if child exited unexpectedly
+        # Check if child exited
         if proc.poll() is not None:
-            print(f"Tray exited (rc={proc.returncode}) — restarting in {RESTART_COOLDOWN_S}s",
+            rc = proc.returncode
+            if rc == 0:
+                # Intentional quit (user clicked "Quit tray") — exit launcher too.
+                print("Tray quit cleanly — exiting launcher.", flush=True)
+                sys.exit(0)
+            # Non-zero = crash — restart automatically.
+            print(f"Tray crashed (rc={rc}) — restarting in {RESTART_COOLDOWN_S}s",
                   flush=True)
             time.sleep(RESTART_COOLDOWN_S)
             mtime = TRAY_SCRIPT.stat().st_mtime

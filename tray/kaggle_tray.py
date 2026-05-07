@@ -342,6 +342,10 @@ class KaggleTray:
     def _quit(self, icon, item) -> None:
         self._stop.set()
         self.icon.stop()
+        # Exit with code 0 so tray_launcher.py knows this was intentional
+        # and does NOT restart us. Non-zero exit = crash = launcher restarts.
+        import os
+        os._exit(0)
 
     def _call_action(self, action: str) -> None:
         if not self._action_lock.acquire(blocking=False):
