@@ -46,6 +46,92 @@ Live response captured at end of build:
 }
 ```
 
+### State machine — pause / resume / stop
+
+Four endpoints control the agent's lifecycle without ever touching the
+FastAPI service or Telegram bot themselves (those must always stay up so
+the user can issue commands).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/system/state` | current state + when it was set |
+| POST | `/system/pause` | freeze agent processes via cgroupv2 + stop Ollama |
+| POST | `/system/resume` | thaw / recreate agent + start Ollama |
+| POST | `/system/stop` | SIGTERM agent processes + kill tmux + stop Ollama |
+
+States are: `running`, `paused`, `stopped` (plus `transitioning` shown
+purely client-side while a request is in flight). Persisted to
+`state.json` in the repo root and reconciled on read — if `state.json`
+says `running` but the tmux session is gone, the API reports `stopped`
+with `note: "session_missing"`. **No state-changing endpoint clears the
+note**; only fresh transitions do.
+
+Implementation detail worth knowing for the UI: pause uses cgroupv2
+`cgroup.freeze` rather than `SIGSTOP`. On WSL2 with systemd, SIGSTOP
+delivered cross-cgroup is silently ignored (a CPU-bound python keeps
+running at 100% after `kill -STOP` returns success). cgroup.freeze works
+reliably and is owned by the user, so no sudo is needed.
+
+#### `GET /system/state` — example
+```json
+{
+  "state": "running",
+  "since": 1778125260.9,
+  "active_competition": null
+}
+```
+When the agent has crashed or been killed externally:
+```json
+{
+  "state": "stopped",
+  "since": 1778125261.0,
+  "note": "session_missing",
+  "active_competition": null
+}
+```
+
+#### `POST /system/pause` — example response
+```json
+{
+  "state": "paused",
+  "since": 1778125257.7,
+  "paused_pids": 1,
+  "frozen_scopes": 1,
+  "active_competition": null
+}
+```
+Side effects: every PID in the `kaggle-agent` tmux session has its cgroup
+frozen; Ollama service is stopped; a Telegram message `⏸ Agent paused.`
+is sent.
+
+#### `POST /system/resume` — example response
+```json
+{
+  "state": "running",
+  "since": 1778125260.9,
+  "resumed_pids": 1,
+  "thawed_scopes": 1,
+  "active_competition": null
+}
+```
+If the tmux session is missing (we were `stopped`), this endpoint runs
+`tmux new-session -d -s kaggle-agent ... bash scripts/start_agent.sh`
+to recreate it, then thaws the scope and starts Ollama. Telegram
+notification: `▶ Agent resumed.`
+
+#### `POST /system/stop` — example response
+```json
+{
+  "state": "stopped",
+  "since": 1778125274.6,
+  "terminated_pids": 1,
+  "active_competition": null
+}
+```
+SIGCONT (in case it was paused) → SIGTERM → 1 second grace → SIGKILL →
+`tmux kill-session` → `systemctl stop ollama`. Telegram notification:
+`■ Agent stopped.`
+
 ### `GET /system/ssh-info`
 ```json
 {
@@ -185,6 +271,57 @@ session is created by `scripts/wsl_startup.sh` at WSL boot.
    want to browse runs from the web UI directly.
 
 ---
+
+## Web UI work needed (Session 2)
+
+The `/system/*` endpoints exist server-side; the agency-platform UI still
+needs to surface them:
+
+1. **Sidebar state badge** — next to the existing health status dot, render
+   a small badge showing the lifecycle state from `GET /system/state`:
+   `Running` (green), `Paused` (yellow), `Stopped` (gray). When the dot is
+   already red (API offline) the badge is hidden.
+2. **Dashboard buttons** — `Pause`, `Resume`, `Stop`. Enabled state mirrors
+   the tray app:
+   - Pause: enabled only when state is `running`
+   - Stop: enabled when `running` or `paused`
+   - Resume: enabled when `paused` or `stopped`
+3. **Confirmation dialog on Stop** — Stop is destructive (kills the
+   Claude Code tmux session and any active training). Prompt before POST.
+4. **Optimistic UI** — set the badge to a transitioning style as soon as
+   the user clicks; reconcile when the response arrives.
+5. **Polling** — bump `/system/state` polling cadence to match the
+   existing 10 s `/health` poll, or piggyback on a single combined call.
+
+## Windows tray app
+
+A native Windows tray app lives in `tray/` and exposes the same controls
+without opening the browser. Install once on Windows (not WSL2):
+
+```
+pip install pystray pillow requests
+```
+
+Run by double-clicking `tray/start_tray.bat` (uses `pythonw` so no console
+window appears).
+
+Auto-start on login: drop a shortcut to `tray/start_tray.bat` into
+`shell:startup`, or create a Task Scheduler entry "At log on" pointing at
+`pythonw kaggle_tray.py`. Full instructions in `tray/README.md`.
+
+The icon is a bold "K" on a coloured rounded square:
+
+| Colour | Meaning |
+|---|---|
+| 🟢 green | running |
+| 🟡 yellow | paused |
+| ⚪ gray | stopped |
+| 🔵 blue | transitioning (request in flight) |
+| 🔴 red | API unreachable |
+
+The tray polls `GET /system/state` every 5 s. The dashboard URL it opens
+is hard-coded to `https://kaggle.nnaq.net`; change `DASHBOARD_URL` at the
+top of `kaggle_tray.py` if the Cloudflare host differs.
 
 ## How to start the agent
 ```bash

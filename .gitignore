@@ -36,4 +36,5 @@ cloudflared.deb
 HANDOFF.md.bak
 message_bus.sqlite3
 message_bus.sqlite3-*
+state.json
 

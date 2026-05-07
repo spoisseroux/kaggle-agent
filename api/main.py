@@ -31,6 +31,7 @@ from core import gpu_monitor  # noqa: E402
 from core import memory  # noqa: E402
 from core import message_bus  # noqa: E402
 from core import ollama_client  # noqa: E402
+from core import system_control  # noqa: E402
 from core.notify import send_telegram  # noqa: E402
 
 API_VERSION = "0.1.0"
@@ -115,6 +116,44 @@ def health() -> dict:
         "uptime_s": int((dt.datetime.utcnow() - START_TIME).total_seconds()),
         "last_updated": dt.datetime.utcnow().isoformat() + "Z",
     }
+
+
+# ---------- system state machine ----------
+
+@app.get("/system/state")
+def system_state() -> dict:
+    s = system_control.get_state()
+    return {**s, "active_competition": _active_slug()}
+
+
+@app.post("/system/pause")
+def system_pause() -> dict:
+    result = system_control.pause()
+    try:
+        send_telegram("⏸ Agent paused.")
+    except Exception:
+        pass
+    return {**result, "active_competition": _active_slug()}
+
+
+@app.post("/system/resume")
+def system_resume() -> dict:
+    result = system_control.resume()
+    try:
+        send_telegram("▶ Agent resumed.")
+    except Exception:
+        pass
+    return {**result, "active_competition": _active_slug()}
+
+
+@app.post("/system/stop")
+def system_stop() -> dict:
+    result = system_control.stop()
+    try:
+        send_telegram("■ Agent stopped.")
+    except Exception:
+        pass
+    return {**result, "active_competition": _active_slug()}
 
 
 @app.get("/system/ssh-info")
