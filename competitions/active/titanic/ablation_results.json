@@ -1,0 +1,37 @@
+[
+  {
+    "name": "All features",
+    "exclude": "none",
+    "cv_mean": 0.8114493754315486,
+    "cv_std": 0.010973596443815325,
+    "n_features": 15
+  },
+  {
+    "name": "Without Title",
+    "exclude": "title",
+    "cv_mean": 0.8002196974452327,
+    "cv_std": 0.026525567826877844,
+    "n_features": 14
+  },
+  {
+    "name": "Without Cabin",
+    "exclude": "cabin",
+    "cv_mean": 0.8103320569957944,
+    "cv_std": 0.006336775865800002,
+    "n_features": 14
+  },
+  {
+    "name": "Without Interactions",
+    "exclude": "interactions",
+    "cv_mean": 0.8069675475488042,
+    "cv_std": 0.012955203114056431,
+    "n_features": 13
+  },
+  {
+    "name": "Without Ticket",
+    "exclude": "ticket",
+    "cv_mean": 0.8125729709371665,
+    "cv_std": 0.010359322080142298,
+    "n_features": 14
+  }
+]

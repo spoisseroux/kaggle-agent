@@ -1,0 +1,40 @@
+================================================================================
+REGULARIZED XGBOOST - Reduced Complexity
+================================================================================
+
+📋 Parameters:
+  n_estimators        : 150
+  learning_rate       : 0.01
+  max_depth           : 4
+  min_child_weight    : 10
+  subsample           : 0.8
+  colsample_bytree    : 0.8
+  gamma               : 0.1
+  reg_alpha           : 0.1
+  reg_lambda          : 1.0
+  random_state        : 42
+
+⏳ Evaluating with 5-fold CV...
+
+✅ CV Score: 0.8047 (±0.0225)
+   Folds: [0.79329609 0.78651685 0.78089888 0.8258427  0.83707865]
+
+   ⚠️  Lower CV: -0.0438
+   (Lower CV might generalize better!)
+
+⏳ Training on full dataset...
+⏳ Making predictions...
+
+✅ Submission saved: /home/keehar/kaggle-agent/competitions/active/titanic/submissions/xgb_regularized_submission.csv
+   Predicted survival rate: 29.19%
+
+📝 Logging to MLflow...
+🏃 View run trusting-bass-674 at: http://localhost:5000/#/experiments/2/runs/7493ec5d65b745f7a245d02e29e275ec
+🧪 View experiment at: http://localhost:5000/#/experiments/2
+Traceback (most recent call last):
+  File "/home/keehar/kaggle-agent/competitions/active/titanic/src/xgb_regularized.py", line 121, in <module>
+    main()
+  File "/home/keehar/kaggle-agent/competitions/active/titanic/src/xgb_regularized.py", line 103, in main
+    run.log_params(params)
+    ^^^^^^^^^^^^^^
+AttributeError: 'tuple' object has no attribute 'log_params'

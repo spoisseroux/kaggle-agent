@@ -1,0 +1,40 @@
+================================================================================
+FEATURE ABLATION STUDY
+================================================================================
+
+⏳ Testing: All features...
+   Features: 15, CV: 0.8114 (±0.0110)
+
+⏳ Testing: Without Title...
+   Features: 14, CV: 0.8002 (±0.0265)
+
+⏳ Testing: Without Cabin...
+   Features: 14, CV: 0.8103 (±0.0063)
+
+⏳ Testing: Without Interactions...
+   Features: 13, CV: 0.8070 (±0.0130)
+
+⏳ Testing: Without Ticket...
+   Features: 14, CV: 0.8126 (±0.0104)
+
+================================================================================
+ABLATION STUDY RESULTS
+================================================================================
+
+Configuration             Features   CV Score       
+------------------------------------------------------------
+All features              15         0.8114 (±0.0110)
+Without Title             14         0.8002 (±0.0265)
+Without Cabin             14         0.8103 (±0.0063)
+Without Interactions      13         0.8070 (±0.0130)
+Without Ticket            14         0.8126 (±0.0104)
+
+🏆 Best CV: Without Ticket with 0.8126
+
+💡 Insights:
+   Without Title            : CV degraded by -0.0112
+   Without Cabin            : CV degraded by -0.0011
+   Without Interactions     : CV degraded by -0.0045
+   Without Ticket           : CV improved by +0.0011
+
+✅ Results saved: /home/keehar/kaggle-agent/competitions/active/titanic/ablation_results.json

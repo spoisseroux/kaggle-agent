@@ -1,0 +1,30 @@
+================================================================================
+MINIMAL FEATURES - XGBoost with Core Features Only
+================================================================================
+
+📋 Features (6):
+   ['Pclass', 'Sex_male', 'Age', 'Fare', 'FamilySize', 'IsAlone']
+
+⏳ Evaluating with 5-fold CV...
+
+✅ CV Score: 0.7924 (±0.0117)
+   Folds: [0.7877095  0.78089888 0.78651685 0.81460674 0.79213483]
+
+⏳ Training on full dataset...
+
+📊 Feature Importance:
+   Sex_male       : 0.7217
+   Pclass         : 0.1306
+   Fare           : 0.0447
+   FamilySize     : 0.0441
+   Age            : 0.0304
+   IsAlone        : 0.0286
+
+⏳ Making predictions...
+
+✅ Submission saved: /home/keehar/kaggle-agent/competitions/active/titanic/submissions/xgb_minimal_features_submission.csv
+   Predicted survival rate: 25.12%
+
+================================================================================
+MINIMAL FEATURES COMPLETE — CV: 0.7924
+================================================================================
