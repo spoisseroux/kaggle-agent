@@ -133,9 +133,9 @@ def _open_tmux_window() -> None:
     Never creates a bogus grouped session via 'new-session -t'.
     """
     bash_cmd = (
-        "tmux attach-session -t kaggle-agent 2>/dev/null || "
-        "{ echo 'kaggle-agent session not running — start it via wsl_startup.sh'; "
-        "cd /home/keehar/kaggle-agent && exec bash; }"
+        "tmux attach-session -t kaggle-agent 2>/dev/null"
+        " || (echo 'kaggle-agent session not running -- start it via wsl_startup.sh';"
+        " cd /home/keehar/kaggle-agent && exec bash)"
     )
     # Try Windows Terminal first (no -d flag — avoids UNC/Windows path issues)
     try:
