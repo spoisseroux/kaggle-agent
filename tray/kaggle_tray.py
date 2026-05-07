@@ -198,16 +198,25 @@ class KaggleTray:
                 label += f"  [{stage_txt}]"
             return label
 
-        # Model submenu — radio-style checkmarks
+        # Model submenu — checkmarks (radio=True omitted for pystray compat)
+        # Use factory functions so pystray sees exactly 2-arg actions.
+        def _model_action(m):
+            def action(icon, item):
+                self._set_model(m)
+            return action
+
+        def _model_check(m):
+            def checked(item):
+                return self.current_model == m
+            return checked
+
         model_items = []
         for label, model_id in AVAILABLE_MODELS:
-            mid = model_id  # capture for closure
             model_items.append(
                 pystray.MenuItem(
                     label,
-                    lambda icon, item, m=mid: self._set_model(m),
-                    checked=lambda item, m=mid: self.current_model == m,
-                    radio=True,
+                    _model_action(model_id),
+                    checked=_model_check(model_id),
                 )
             )
 

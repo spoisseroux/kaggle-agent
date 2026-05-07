@@ -122,6 +122,47 @@ Examples of instructions you might receive:
 - "the Qdrant service on docker is down, work without it for now"
 - "rebuild the telegram bot service, it crashed"
 
+## Progress reporting (mandatory)
+Before every operation that will take >30 seconds, send a notify with:
+- What you're about to do
+- Rough time estimate
+- What you'll send when done
+
+Example: `python core/notify.py "🏋 Starting XGBoost training — ~8 min. Will notify when CV is ready."`
+
+During long runs (>5 min), send a progress update every ~5 minutes:
+`python core/notify.py "⏳ Still training — epoch 23/50, ~6 min remaining"`
+
+After finishing any task the user asked about, always send a clear completion
+message with the result before asking what to do next. Never go silent after
+"Got it, thinking..." — always follow up.
+
+## Message queue handling
+If a message arrives while you're mid-task, handle it gracefully:
+1. Finish or checkpoint the current operation first (don't abandon mid-training)
+2. Acknowledge: `python core/notify.py "📥 Got your message — finishing current step (~2 min), then I'll handle it"`
+3. Then process the queued instruction
+
+If you receive a reply to an ask_human() call, process ONLY that reply and
+continue the flow it belongs to. Do not conflate it with other pending messages.
+
+## API rate limit handling
+If you hit an Anthropic rate limit error (429 / RateLimitError):
+1. Send: `python core/notify.py "⏳ API rate limit hit — waiting X min before resuming"`
+2. Sleep for the retry-after period (default 60 s if header missing)
+3. Resume exactly where you left off — do not restart the full workflow
+4. If limits persist >30 min, notify and pause: `python core/ask_human.py "Rate limits are blocking progress for 30+ min. Switch to haiku model or wait?"`
+
+## Local LLM — use Ollama aggressively to save API credits
+Ollama (qwen3:14b) is free and already running. Shift as much work as possible:
+- ALL boilerplate code generation → Ollama
+- Feature implementation once the approach is decided → Ollama
+- Summarising experiment results → Ollama
+- Debugging obvious errors (syntax, import, shape mismatches) → Ollama
+- Writing tests, docstrings, configs → Ollama
+Reserve Claude (this model) for: choosing strategy, interpreting surprising
+results, designing the experiment plan, and ask_human decisions.
+
 ## Documentation (mandatory)
 When you create a file: add a section to the relevant `docs/` file.
 When you change how something works: update the relevant `docs/` file.
