@@ -12,12 +12,14 @@ All development work complete. Ready for submission pending Kaggle API authentic
 - [x] Model selection — completed (tested LightGBM, XGBoost, RandomForest)
 - [x] Hyperparameter tuning — completed (Optuna, 50 trials per model)
 - [x] Ensembling — completed (weighted voting tested, not better than single model)
-- [ ] **Submit** — **BLOCKED: Kaggle API 401 error**
+- [x] **Submit** — **✅ SUBMITTED** (Public LB: 0.77511)
 
 ## Best Model: XGBoost
 - **CV Score:** 0.8485 (5-fold stratified cross-validation)
+- **Public LB Score:** 0.77511 ⚠️ **CV/LB gap: -0.0734**
 - **Submission file:** `submissions/optuna_best_submission.csv`
 - **Predicted survival rate:** 35.89%
+- **Submitted:** 2026-05-07 18:21:48 UTC
 
 ### Hyperparameters
 ```python
