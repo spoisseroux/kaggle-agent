@@ -186,24 +186,145 @@ SIGCONT (in case it was paused) → SIGTERM → 1 second grace → SIGKILL →
 |---|---|---|
 | `GET /gpu/stream` | Server-Sent Events (`text/event-stream`) | snapshot every 3 s |
 | `WS  /chat/ws` | WebSocket — JSON messages | initial dump of last 50, then live |
+| `WS  /terminal/ws` | WebSocket — JSON messages | tmux pane output every 500 ms |
 
-WebSocket client framing — incoming events from server look like
-`{ "id": ..., "role": "agent"|"human", "source": "telegram"|"web"|"agent",
-"text": ..., "status": ..., "ask_id": ..., "created_at": ... }`. Outgoing
-client messages must be `{"text": "..."}`. Server replies with
-`{"ack": "<msg_id>"}` after persisting.
+WebSocket client framing:
+- **Chat** (`/chat/ws`): incoming events from server look like
+  `{ "id": ..., "role": "agent"|"human", "source": "telegram"|"web"|"agent",
+  "text": ..., "status": ..., "ask_id": ..., "created_at": ... }`. Outgoing
+  client messages must be `{"text": "..."}`. Server replies with
+  `{"ack": "<msg_id>"}` after persisting.
+- **Terminal** (`/terminal/ws`): server sends `{"type": "output"|"status"|"error",
+  "data": "...", "ts": "..."}` every 500 ms. `type: "output"` contains the
+  tmux pane content; `type: "status"` with `data: "session offline"` means
+  the tmux session doesn't exist.
 
 ---
 
-## Frontend env vars
+## Standalone kaggle-ui repository spec
+
+**Repository:** separate Next.js 14+ App Router project deploying to Vercel  
+**Production URL:** `https://kaggle-ui.nnaq.net`  
+**Design:** black and white monospace throughout (e.g., IBM Plex Mono, Roboto Mono, or JetBrains Mono)  
+**Terminal:** xterm.js for the `/terminal` page, full-screen black background with white text
+
+### Environment variables (Vercel)
+
+```bash
+# API base URL (HTTP for REST endpoints)
+NEXT_PUBLIC_KAGGLE_API_URL=https://kaggle-ui.nnaq.net
+
+# WebSocket base URL (wss:// for production, ws:// for local dev)
+NEXT_PUBLIC_KAGGLE_WS_URL=wss://kaggle-ui.nnaq.net
+
+# Simple password middleware (server-side)
+PASSWORD=your-secure-password-here
 ```
-NEXT_PUBLIC_KAGGLE_API_URL=http://kaggle:8765        # while on Tailscale
-# When the Cloudflare Tunnel is up, switch to:
-# NEXT_PUBLIC_KAGGLE_API_URL=https://kaggle.<your-domain>
+
+For local development:
+```bash
+NEXT_PUBLIC_KAGGLE_API_URL=http://localhost:8765
+NEXT_PUBLIC_KAGGLE_WS_URL=ws://localhost:8765
+PASSWORD=dev
 ```
-The UI should poll `/health` every 10 s with a 3 s timeout to drive the
-sidebar status dot (online / degraded / offline). On WebSocket disconnect,
-go offline immediately without waiting for the next poll.
+
+### Authentication
+
+Simple middleware password check using `PASSWORD` env var. On first visit, show a
+centered password prompt (black background, white monospace input). Store the
+password in a secure httpOnly cookie after validation. Middleware checks the
+cookie on every request. No user accounts, no database — single shared password.
+
+Example route structure:
+- `/login` — password form
+- `middleware.ts` — validates cookie, redirects to `/login` if missing/invalid
+- All other routes protected
+
+### Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/` or `/dashboard` | Overview: system state, active competition, GPU snapshot, recent experiments summary, quick links |
+| `/terminal` | Full-screen xterm.js terminal connected to `WS /terminal/ws`, auto-reconnect on disconnect |
+| `/chat` | Chat interface connected to `WS /chat/ws`, message history, send box at bottom |
+| `/experiments` | Table of experiments from `GET /experiments`, filterable by competition, sortable by CV score |
+| `/gpu` | Real-time GPU monitor connected to `GET /gpu/stream` (SSE), live charts for VRAM/util/temp/power |
+| `/competitions` | List from `GET /competitions`, show active, switch competition via `POST /competitions/switch` |
+| `/logs` | Tail of agent logs from `GET /logs?lines=200`, auto-refresh every 5 s or live SSE if available |
+| `/submissions` | Table from `GET /submissions`, show submission history per competition |
+| `/leaderboard` | Fetch from `GET /leaderboard/{slug}`, display raw output or parse into table |
+| `/memory` | Memory stack status from `GET /memory/status`, show Postgres/Qdrant/MCP/Tailscale health and latency |
+
+### WebSocket and SSE endpoints for UI
+
+| Endpoint | Production URL | Protocol |
+|----------|---------------|----------|
+| Health polling | `https://kaggle-ui.nnaq.net/health` | HTTP GET |
+| GPU stream | `https://kaggle-ui.nnaq.net/gpu/stream` | Server-Sent Events |
+| Chat WebSocket | `wss://kaggle-ui.nnaq.net/chat/ws` | WebSocket |
+| Terminal WebSocket | `wss://kaggle-ui.nnaq.net/terminal/ws` | WebSocket |
+
+All other endpoints are HTTP GET/POST to `NEXT_PUBLIC_KAGGLE_API_URL`.
+
+### Design guidelines
+
+- **Typography:** monospace only (IBM Plex Mono, Roboto Mono, or JetBrains Mono)
+- **Colors:** pure black (#000) background, pure white (#FFF) text, gray (#666, #999) for secondary text
+- **Layout:** sidebar nav on left (fixed width ~200px), main content area on right
+- **Tables:** simple borders, alternating row backgrounds (#111 vs #000), sortable columns
+- **Terminal:** xterm.js full-screen, black bg, white text, 80x24 default, fit-addon to resize
+- **Charts (GPU page):** lightweight canvas-based (e.g., Chart.js with dark theme) or plain ASCII charts
+- **Status indicators:** colored dots (green/yellow/red) for online/degraded/offline, but keep text labels
+- **Buttons:** simple bordered rectangles, white border, white text, hover inverts to black bg + white text
+- **No animations** except for loading spinners (simple CSS keyframes)
+
+### Key implementation notes
+
+1. **Poll `/health` every 10 s** (3 s timeout) to drive the global status indicator in the sidebar.
+2. **Auto-reconnect WebSockets** on disconnect with exponential backoff (1s, 2s, 4s, 8s max).
+3. **Terminal page**: use xterm.js with `fit` addon, connect to `/terminal/ws`, parse `type: "output"` and write to terminal, show "session offline" banner if `type: "status"`.
+4. **Chat page**: initial history dump on connect, append new messages as they arrive, auto-scroll to bottom.
+5. **GPU page**: use SSE `EventSource`, parse `data:` lines as JSON, update charts live.
+6. **Experiments/Submissions tables**: client-side sort, filter by competition dropdown, highlight best CV score.
+7. **Memory page**: show latency bar charts for Postgres/Qdrant/MCP, Qdrant collection vector counts, Tailscale connection status.
+
+### Deploy to Vercel
+
+```bash
+vercel env add NEXT_PUBLIC_KAGGLE_API_URL
+vercel env add NEXT_PUBLIC_KAGGLE_WS_URL
+vercel env add PASSWORD
+vercel --prod
+```
+
+Custom domain `kaggle-ui.nnaq.net` must point to the Vercel deployment. The API
+backend (`http://kaggle:8765` on Tailscale or Cloudflare Tunnel) handles CORS
+for `https://*.vercel.app` and `https://kaggle-ui.nnaq.net`.
+
+---
+
+## Memory stack (Tailscale VM 'docker')
+
+The Kaggle agent connects to a separate Tailscale VM named `docker` that hosts:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| PostgreSQL | 5432 | `claude_memory` database with tables: `kaggle_competitions`, `kaggle_experiments`, `kaggle_features`, `kaggle_submissions`, `kaggle_datasets` |
+| Qdrant | 6333 | Vector collections: `kaggle_features`, `kaggle_experiments`, `kaggle_insights`, `kaggle_errors`, `claude_memory` |
+| MCP server | 8000 | Memory MCP server with bearer token auth (`MCP_BEARER_TOKEN` in `.env`) |
+
+All connection details are in `.env`:
+```bash
+TAILSCALE_MEMORY_HOST=docker
+POSTGRES_DSN=postgresql://claude:PASSWORD@docker:5432/claude_memory
+QDRANT_URL=http://docker:6333
+MCP_URL=http://docker:8000
+MCP_BEARER_TOKEN=...
+```
+
+The agent uses `core/memory.py` to interact with the stack. If the stack goes
+offline, the agent continues working with degraded functionality (no memory
+persistence). The web UI `/memory` page shows real-time status.
 
 ---
 

@@ -42,6 +42,13 @@ app = FastAPI(title="Kaggle Agent API", version=API_VERSION)
 origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not origins:
     origins = ["*"]
+
+# Always allow Vercel deployments and production domain
+origins.extend([
+    "https://*.vercel.app",
+    "https://kaggle-ui.nnaq.net",
+])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -371,6 +378,40 @@ async def chat_ws(ws: WebSocket) -> None:
                 if float(m["created_at"]) > last_seen:
                     await ws.send_text(json.dumps(m, default=str))
                     last_seen = float(m["created_at"])
+    except WebSocketDisconnect:
+        return
+
+
+@app.websocket("/terminal/ws")
+async def terminal_ws(ws: WebSocket) -> None:
+    """Stream live tmux pane output every 500ms."""
+    await ws.accept()
+    try:
+        while True:
+            try:
+                r = subprocess.run(
+                    ["tmux", "capture-pane", "-p", "-t", "kaggle-agent", "-e"],
+                    capture_output=True, text=True, timeout=2,
+                )
+                if r.returncode == 0:
+                    await ws.send_text(json.dumps({
+                        "type": "output",
+                        "data": r.stdout,
+                        "ts": dt.datetime.utcnow().isoformat() + "Z"
+                    }))
+                else:
+                    await ws.send_text(json.dumps({
+                        "type": "status",
+                        "data": "session offline",
+                        "ts": dt.datetime.utcnow().isoformat() + "Z"
+                    }))
+            except Exception as e:
+                await ws.send_text(json.dumps({
+                    "type": "error",
+                    "data": str(e),
+                    "ts": dt.datetime.utcnow().isoformat() + "Z"
+                }))
+            await asyncio.sleep(0.5)
     except WebSocketDisconnect:
         return
 
