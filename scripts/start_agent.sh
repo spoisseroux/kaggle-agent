@@ -22,6 +22,7 @@ PY
 exec claude \
   --dangerously-skip-permissions \
   --mcp-config .claude/mcp_config.json \
+  -- \
   "You are the Kaggle agent. Active competition: $ACTIVE_SLUG.
    Read CLAUDE.md for full instructions.
    Check the ai-memory MCP for context from last session.
