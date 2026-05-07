@@ -1,4 +1,15 @@
 {
-  "active": null,
-  "competitions": {}
+  "active": "titanic",
+  "competitions": {
+    "titanic": {
+      "slug": "titanic",
+      "name": "Titanic - Machine Learning from Disaster",
+      "metric": "accuracy",
+      "higher_better": true,
+      "deadline": "2030-12-31",
+      "status": "active",
+      "submissions_max": 10,
+      "created_at": "2026-05-07T17:18:20.777043Z"
+    }
+  }
 }

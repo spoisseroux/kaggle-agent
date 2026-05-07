@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-07 — Titanic: Optuna tuning + ensemble evaluation
+
+### Competition Progress
+- **Completed full workflow:** EDA → data pipeline → baseline → feature engineering (v2, v3) → model selection → Optuna tuning
+- **Best model:** XGBoost with 0.8485 CV accuracy (5-fold stratified)
+  - Parameters: n_estimators=294, learning_rate=0.021, max_depth=7, etc.
+- **Ensemble tested:** Weighted voting (XGBoost 40% + LightGBM 35% + RF 25%)
+  - Result: 0.8428 CV (degradation of -0.0057)
+  - **Decision:** Stick with XGBoost for submission
+- **Submissions ready:** 6 files generated, best is `optuna_best_submission.csv`
+- **Blocker:** Kaggle API returns 401 Unauthorized, awaiting credential refresh from human
+
+### Files created
+- `competitions/active/titanic/src/ensemble.py` — ensemble model with weighted voting
+- `competitions/active/titanic/ensemble_log.txt` — ensemble evaluation results
+- `competitions/active/titanic/optuna_log.txt` — hyperparameter tuning results
+
 ## 2026-05-07 — Phase 6: message wake, run-stage, model API, tray settings, auto-restart
 
 ### Fixes

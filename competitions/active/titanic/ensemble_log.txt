@@ -1,0 +1,30 @@
+================================================================================
+ENSEMBLE: XGBoost + LightGBM + RandomForest
+================================================================================
+
+⏳ Evaluating ensemble with 5-fold CV...
+   CV Score: 0.8428 (±0.0186)
+   Individual folds: [0.86592179 0.85955056 0.81460674 0.83146067 0.84269663]
+
+   ⚠️  Degradation: -0.0057
+
+⏳ Training ensemble on full dataset...
+⏳ Making predictions on test set...
+
+✅ Submission saved: /home/keehar/kaggle-agent/competitions/active/titanic/submissions/ensemble_submission.csv
+   Predicted survival rate: 36.36%
+
+📝 Logging to MLflow...
+Traceback (most recent call last):
+  File "/home/keehar/kaggle-agent/competitions/active/titanic/src/ensemble.py", line 160, in <module>
+    main()
+  File "/home/keehar/kaggle-agent/competitions/active/titanic/src/ensemble.py", line 135, in main
+    with mlflow_run("titanic", "ensemble") as run:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/keehar/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 301, in helper
+    return _GeneratorContextManager(func, args, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/keehar/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 105, in __init__
+    self.gen = func(*args, **kwds)
+               ^^^^^^^^^^^^^^^^^^^
+TypeError: run() takes 1 positional argument but 2 were given
