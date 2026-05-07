@@ -1,0 +1,23 @@
+[Unit]
+Description=MLflow tracking server (local)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keehar
+Group=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/keehar/kaggle-venv/bin/mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:////home/keehar/kaggle-agent/mlruns/mlflow.db \
+  --default-artifact-root file:///home/keehar/kaggle-agent/mlruns
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/keehar/kaggle-agent/logs/mlflow.log
+StandardError=append:/home/keehar/kaggle-agent/logs/mlflow.log
+
+[Install]
+WantedBy=multi-user.target
