@@ -148,7 +148,7 @@ def main():
                 # Long pastes need more time for Claude Code to process
                 total_length = sum(len(msg[1]) for msg in new_messages)
                 if total_length > 1000:
-                    delay = 3  # 3 seconds for long messages
+                    delay = 6  # 6 seconds for long messages (Claude needs time to process paste)
                     print(f"   Long message detected ({total_length} chars) - waiting {delay}s")
                 else:
                     delay = 1  # 1 second for short messages
@@ -159,12 +159,16 @@ def main():
                 if claude_pane:
                     print(f"   Sending Enter to {claude_pane}...")
 
-                    # Send Enter key (twice for long messages to be sure)
+                    # Send Enter key (multiple times for long messages to be sure)
                     success = send_enter_to_pane(claude_pane)
                     if total_length > 1000 and success:
-                        time.sleep(0.5)
+                        # For long messages, send Enter 3 times with 1s gaps
+                        # This handles cases where Claude shows paste preview or needs confirmation
+                        time.sleep(1)
                         send_enter_to_pane(claude_pane)
-                        print(f"   ✅ Enter sent (2x for long message)")
+                        time.sleep(1)
+                        send_enter_to_pane(claude_pane)
+                        print(f"   ✅ Enter sent (3x for long message)")
                     elif success:
                         print(f"   ✅ Enter sent successfully")
 
