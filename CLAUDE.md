@@ -103,19 +103,27 @@ Call: `python core/ask_human.py "Your question here"`
 When models are ready and you want to submit, ALWAYS do this:
 ```python
 # Never just print options to the terminal — user cannot see it
+# Never run ask_human.py as a background task — it will consume
+# unrelated messages as fake replies
 import subprocess
 result = subprocess.run(
     ["python", "core/ask_human.py",
      "Ready to submit. Options:\n"
-     "1) xgb_v1_submission.csv — CV 0.321 (recommended)\n"
-     "2) lgbm_optuna.csv — CV 0.340\n"
-     "3) ensemble.csv — blend\n"
+     "1) xgb_v1_submission.csv  CV: 0.321 (recommended)\n"
+     "2) lgbm_optuna.csv  CV: 0.340\n"
+     "3) ensemble.csv  blend\n"
      "Which number, or 'wait' to keep optimizing?"],
     capture_output=True, text=True
+    # NO timeout= here — wait as long as needed
 )
 choice = result.stdout.strip()
 ```
 Only after receiving a reply do you proceed.
+
+> **NOTE on filenames:** Telegram destroys underscores in Markdown mode.
+> When listing filenames or scores in messages, use spaces or dashes
+> instead of underscores: `xgb-v2-fixed-lags.csv` not `xgb_v2_fixed_lags.csv`.
+> Or just describe: "XGBoost v2 with fixed lags".
 
 ## Downloads — always use download_guard
 Before downloading ANY dataset, model, or large file:
