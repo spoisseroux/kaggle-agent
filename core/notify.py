@@ -72,6 +72,7 @@ def send_telegram(text: str) -> bool:
             r = httpx.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": chat_id, "text": chunk,
+                      "parse_mode": "Markdown",
                       "disable_web_page_preview": True},
                 timeout=8,
             )

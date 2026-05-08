@@ -56,6 +56,7 @@ if not origins:
 origins.extend([
     "https://*.vercel.app",
     "https://kaggle-ui.nnaq.net",
+    "https://app.nnaq.net",
 ])
 
 app.add_middleware(
