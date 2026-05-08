@@ -93,6 +93,34 @@ Call: `python core/ask_human.py "Your question here"`
 - Data quality issue that could invalidate all experiments
 - Any action that cannot be undone
 
+## Downloads — always use download_guard
+Before downloading ANY dataset, model, or large file:
+```python
+from core.download_guard import check_before_download
+
+# Kaggle competition dataset
+ok = check_before_download(
+    kind="kaggle_dataset",
+    identifier="store-sales-time-series-forecasting",
+    dest_dir="data/store-sales-time-series-forecasting",
+)
+if not ok:
+    raise SystemExit("Download cancelled")
+
+# HuggingFace model
+ok = check_before_download(kind="hf_model", identifier="microsoft/phi-2", dest_dir="models/phi-2")
+
+# Generic URL
+ok = check_before_download(kind="url", identifier="https://...", dest_dir="data/")
+```
+This will:
+- Check available disk space (needs 2× the download size free)
+- Ask you via Telegram before any download >1 GB (or unknown size)
+- Refuse outright if <10 GB free on the WSL disk
+- Thresholds are env vars: DOWNLOAD_CONFIRM_GB (default 1.0), DOWNLOAD_MIN_FREE_GB (default 10.0)
+
+Never skip this. An unchecked download can fill the WSL disk and corrupt the database.
+
 ## VRAM — always use vram_manager
 Before any GPU training:
 ```python
