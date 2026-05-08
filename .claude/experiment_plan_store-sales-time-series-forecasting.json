@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Add More Lag and Rolling Features",
+    "description": "Enhance temporal dependencies with additional lag and rolling statistics",
+    "approach": "Add Lag_2, Lag_3, 7-day rolling mean/median to existing Time and Lag_1 features. Use LinearRegression with all features",
+    "expected_cv_delta": 0.005,
+    "priority": 1,
+    "estimated_runtime_min": 15
+  },
+  {
+    "name": "Incorporate Seasonal Time Features",
+    "description": "Add explicit seasonal/time-of-year information",
+    "approach": "Create month, day_of_week, is_holiday features from date. Combine with existing Time/Lag features in LinearRegression",
+    "expected_cv_delta": 0.005,
+    "priority": 2,
+    "estimated_runtime_min": 15
+  },
+  {
+    "name": "Switch to Random Forest with Feature Engineering",
+    "description": "Test non-linear model with existing feature set",
+    "approach": "Use RandomForestRegressor with max_depth=10, n_estimators=100 on Time, Lag_1, and seasonal features",
+    "expected_cv_delta": 0.01,
+    "priority": 3,
+    "estimated_runtime_min": 15
+  },
+  {
+    "name": "Apply Ridge Regression with L2 Regularization",
+    "description": "Test regularized linear model for better generalization",
+    "approach": "Use Ridge(alpha=0.1) with Time, Lag_1, and seasonal features",
+    "expected_cv_delta": 0.005,
+    "priority": 4,
+    "estimated_runtime_min": 15
+  },
+  {
+    "name": "Feature Interaction Engineering",
+    "description": "Add multiplicative interactions between key features",
+    "approach": "Create Time*Lag_1 interaction term. Use LinearRegression with original features + interaction",
+    "expected_cv_delta": 0.005,
+    "priority": 5,
+    "estimated_runtime_min": 15
+  }
+]
