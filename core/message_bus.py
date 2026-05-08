@@ -167,15 +167,62 @@ def get_pending_instructions(claim: bool = True) -> list[dict]:
     return result
 
 
-def list_recent(limit: int = 50) -> list[dict]:
+def list_recent(limit: int = 50, before_id: str | None = None) -> list[dict]:
+    """Return up to *limit* messages, newest first.
+
+    If *before_id* is given, only messages with a ``created_at`` strictly
+    older than the message with that id are returned (cursor-based pagination).
+    """
     init_db()
     with _connect() as c:
-        rows = c.execute(
-            "SELECT id, role, source, text, status, ask_id, created_at "
-            "FROM messages ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if before_id:
+            row = c.execute(
+                "SELECT created_at FROM messages WHERE id=?", (before_id,)
+            ).fetchone()
+            cutoff = row["created_at"] if row else None
+        else:
+            cutoff = None
+
+        if cutoff is not None:
+            rows = c.execute(
+                "SELECT id, role, source, text, status, ask_id, created_at "
+                "FROM messages WHERE created_at < ? ORDER BY created_at DESC LIMIT ?",
+                (cutoff, limit),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT id, role, source, text, status, ask_id, created_at "
+                "FROM messages ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
     return [dict(r) for r in rows]
+
+
+def count_unread() -> int:
+    """Count agent messages that haven't been delivered yet (status='pending')."""
+    init_db()
+    with _connect() as c:
+        row = c.execute(
+            "SELECT COUNT(*) FROM messages WHERE role='agent' AND status='pending'"
+        ).fetchone()
+    return row[0] if row else 0
+
+
+def mark_read_up_to(message_id: str) -> None:
+    """Mark all pending agent messages up to and including *message_id* as delivered."""
+    init_db()
+    with _connect() as c:
+        row = c.execute(
+            "SELECT created_at FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if not row:
+            return
+        cutoff = row["created_at"]
+        c.execute(
+            "UPDATE messages SET status='delivered', updated_at=? "
+            "WHERE role='agent' AND status='pending' AND created_at <= ?",
+            (time.time(), cutoff),
+        )
 
 
 def wake_agent(message_text: str) -> bool:

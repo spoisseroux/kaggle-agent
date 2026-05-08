@@ -342,14 +342,71 @@ def competitions_switch(body: CompetitionSwitch) -> dict:
 
 # ---------- experiments / submissions / leaderboard ----------
 
+def _fmt_experiment(r: dict) -> dict:
+    """Map kaggle_experiments Postgres row → frontend shape."""
+    config = r.get("config") or {}
+    if isinstance(config, str):
+        try:
+            import json as _json
+            config = _json.loads(config)
+        except Exception:
+            config = {}
+    tags: dict = {}
+    if r.get("model_type"):
+        tags["model"] = r["model_type"]
+    if r.get("feature_set"):
+        tags["feature_set"] = r["feature_set"]
+    if r.get("data_version"):
+        tags["data_version"] = r["data_version"]
+    name = "_".join(filter(None, [r.get("model_type"), r.get("feature_set")])) or str(r.get("id", ""))
+    ts = r.get("created_at")
+    if hasattr(ts, "timestamp"):
+        ts = ts.timestamp()
+    return {
+        "id":          str(r.get("id", "")),
+        "name":        name,
+        "competition": r.get("competition_slug"),
+        "mlflow_run":  r.get("mlflow_run_id"),
+        "cv_score":    r.get("cv_mean"),
+        "cv_std":      r.get("cv_std"),
+        "lb_score":    r.get("lb_score"),
+        "params":      config,
+        "tags":        tags,
+        "notes":       r.get("notes"),
+        "duration_s":  r.get("training_time_s"),
+        "ts":          ts,
+    }
+
+
+def _fmt_submission(r: dict) -> dict:
+    """Map kaggle_submissions Postgres row → frontend shape."""
+    ts = r.get("submitted_at")
+    if hasattr(ts, "timestamp"):
+        ts = ts.timestamp()
+    return {
+        "id":           str(r.get("id", "")),
+        "competition":  r.get("competition_slug"),
+        "filename":     r.get("filename"),
+        "cv_score":     r.get("cv_score"),
+        "lb_score":     r.get("lb_score"),
+        "lb_rank":      r.get("lb_rank"),
+        "total_teams":  r.get("total_teams"),
+        "percentile":   r.get("percentile"),
+        "description":  r.get("notes"),
+        "submitted_at": ts,
+    }
+
+
 @app.get("/experiments")
-def experiments(competition: str | None = None, limit: int = 50) -> list[dict]:
-    return memory.list_experiments(competition, limit=limit)
+def experiments(competition: str | None = None, limit: int = 50) -> dict:
+    rows = memory.list_experiments(competition, limit=limit)
+    return {"experiments": [_fmt_experiment(r) for r in rows]}
 
 
 @app.get("/submissions")
-def submissions(competition: str | None = None, limit: int = 50) -> list[dict]:
-    return memory.list_submissions(competition, limit=limit)
+def submissions(competition: str | None = None, limit: int = 50) -> dict:
+    rows = memory.list_submissions(competition, limit=limit)
+    return {"submissions": [_fmt_submission(r) for r in rows]}
 
 
 @app.get("/leaderboard/{slug}")
@@ -405,9 +462,53 @@ class ChatMessage(BaseModel):
     text: str
 
 
+class MarkReadBody(BaseModel):
+    up_to_id: str
+
+
+def _fmt_message(r: dict) -> dict:
+    """Normalise a message_bus row to the frontend wire format.
+
+    DB schema:  id(hex), role('human'|'agent'), source, text, status, created_at
+    Frontend:   id,      role('user'|'agent'),  text,   ts,   read
+    """
+    return {
+        "id":   r["id"],
+        "role": "user" if r["role"] == "human" else "agent",
+        "text": r["text"],
+        "ts":   r["created_at"],
+        # human messages are always "read" (user sent them);
+        # agent messages are read once delivered / not still pending
+        "read": r["role"] == "human" or r.get("status") != "pending",
+    }
+
+
 @app.get("/chat/messages")
-def chat_messages(limit: int = 50) -> list[dict]:
-    return list(reversed(message_bus.list_recent(limit)))
+def chat_messages(limit: int = 50, before: str | None = None) -> dict:
+    """Return paginated messages, oldest-first.
+
+    ``before`` is a message id; only messages older than that id are returned.
+    """
+    rows = message_bus.list_recent(limit + 1, before_id=before)  # fetch +1 to detect has_more
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    # list_recent returns newest-first; reverse to oldest-first for the frontend
+    rows = list(reversed(rows))
+    return {
+        "messages": [_fmt_message(r) for r in rows],
+        "has_more": has_more,
+    }
+
+
+@app.get("/chat/unread_count")
+def chat_unread_count() -> dict:
+    return {"count": message_bus.count_unread()}
+
+
+@app.post("/chat/mark_read")
+def chat_mark_read(body: MarkReadBody) -> dict:
+    message_bus.mark_read_up_to(body.up_to_id)
+    return {"ok": True}
 
 
 @app.post("/chat/send")
@@ -425,7 +526,7 @@ def chat_send(body: ChatMessage) -> dict:
         send_telegram(f"[web] {text}")
     except Exception:
         pass
-    return {"id": msg_id}
+    return {"ok": True, "id": msg_id}
 
 
 @app.websocket("/chat/ws")
