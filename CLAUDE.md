@@ -85,13 +85,37 @@ Store after each experiment:
 - Send progress: `python core/notify.py "message"`
 
 ## When to use ask_human.py
+
+> **CRITICAL: The terminal is NOT visible to the user. Printing a question
+> to the terminal and stopping is INVISIBLE. The ONLY way the user can answer
+> a question is via ask_human.py, which sends it to Telegram.**
+
 Call: `python core/ask_human.py "Your question here"`
-- Before ANY Kaggle leaderboard submission
+- Before ANY Kaggle leaderboard submission — no exceptions, even if you think
+  the answer is obvious. Ask which file to submit, do not choose yourself.
 - CV drops >2% unexpectedly after a change
 - Two approaches tied, >1h compute to evaluate
 - Stuck with no CV improvement for 3+ experiments
 - Data quality issue that could invalidate all experiments
 - Any action that cannot be undone
+
+### Mandatory submission flow
+When models are ready and you want to submit, ALWAYS do this:
+```python
+# Never just print options to the terminal — user cannot see it
+import subprocess
+result = subprocess.run(
+    ["python", "core/ask_human.py",
+     "Ready to submit. Options:\n"
+     "1) xgb_v1_submission.csv — CV 0.321 (recommended)\n"
+     "2) lgbm_optuna.csv — CV 0.340\n"
+     "3) ensemble.csv — blend\n"
+     "Which number, or 'wait' to keep optimizing?"],
+    capture_output=True, text=True
+)
+choice = result.stdout.strip()
+```
+Only after receiving a reply do you proceed.
 
 ## Downloads — always use download_guard
 Before downloading ANY dataset, model, or large file:

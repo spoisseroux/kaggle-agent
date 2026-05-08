@@ -24,7 +24,7 @@
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "python core/notify.py 'Agent paused — waiting for input.'"
+        "command": "python scripts/hooks/on_stop.py"
       }]
     }],
     "PostToolUse": [{
