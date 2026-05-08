@@ -54,6 +54,30 @@ def get_new_messages():
     return messages
 
 
+def is_session_attached(session_name):
+    """Check if a tmux session is currently attached"""
+    try:
+        result = subprocess.run(
+            ["tmux", "list-sessions", "-F", "#{session_name} #{session_attached}"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode != 0:
+            return False
+
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == session_name:
+                return parts[1] == "1"
+
+    except Exception as e:
+        print(f"Error checking session attachment: {e}")
+
+    return False
+
+
 def find_claude_pane():
     """Find the tmux pane running Claude Code"""
     try:
@@ -157,27 +181,37 @@ def main():
                 time.sleep(delay)
 
                 if claude_pane:
-                    print(f"   Sending Enter to {claude_pane}...")
+                    # Extract session name from pane (format: session:window.pane)
+                    session_name = claude_pane.split(':')[0]
 
-                    # Send Enter key (multiple times for long messages to be sure)
-                    success = send_enter_to_pane(claude_pane)
-                    if total_length > 1000 and success:
-                        # For long messages, send Enter 3 times with 1s gaps
-                        # This handles cases where Claude shows paste preview or needs confirmation
-                        time.sleep(1)
-                        send_enter_to_pane(claude_pane)
-                        time.sleep(1)
-                        send_enter_to_pane(claude_pane)
-                        print(f"   ✅ Enter sent (3x for long message)")
-                    elif success:
-                        print(f"   ✅ Enter sent successfully")
-
-                    if success:
-                        # Mark messages as pending so we don't re-process
-                        marked = mark_messages_as_pending()
-                        print(f"   Marked {marked} messages as pending")
+                    # Check if session is attached
+                    if is_session_attached(session_name):
+                        print(f"   ⚠️  Session '{session_name}' is attached - skipping auto-submit")
+                        print(f"       (tmux send-keys doesn't work reliably when user is inside)")
+                        print(f"       User will press Enter manually")
+                        # Don't mark as pending - leave as 'new' so user sees it
                     else:
-                        print(f"   ❌ Failed to send Enter")
+                        print(f"   Sending Enter to {claude_pane}...")
+
+                        # Send Enter key (multiple times for long messages to be sure)
+                        success = send_enter_to_pane(claude_pane)
+                        if total_length > 1000 and success:
+                            # For long messages, send Enter 3 times with 1s gaps
+                            # This handles cases where Claude shows paste preview or needs confirmation
+                            time.sleep(1)
+                            send_enter_to_pane(claude_pane)
+                            time.sleep(1)
+                            send_enter_to_pane(claude_pane)
+                            print(f"   ✅ Enter sent (3x for long message)")
+                        elif success:
+                            print(f"   ✅ Enter sent successfully")
+
+                        if success:
+                            # Mark messages as pending so we don't re-process
+                            marked = mark_messages_as_pending()
+                            print(f"   Marked {marked} messages as pending")
+                        else:
+                            print(f"   ❌ Failed to send Enter")
                 else:
                     print(f"   ❌ No Claude pane found - can't auto-submit")
                     print(f"       Please start Claude Code in tmux session")
