@@ -117,9 +117,13 @@ This will:
 - Check available disk space (needs 2× the download size free)
 - Ask you via Telegram before any download >1 GB (or unknown size)
 - Refuse outright if <10 GB free on the WSL disk
-- Thresholds are env vars: DOWNLOAD_CONFIRM_GB (default 1.0), DOWNLOAD_MIN_FREE_GB (default 10.0)
+- Thresholds configurable via env vars:
+  - DOWNLOAD_CONFIRM_GB=10   (ask before downloads >10 GB, default)
+  - DOWNLOAD_MIN_FREE_GB=20  (refuse if <20 GB effective free, default)
+  - DOWNLOAD_LOW_C_GB=80     (warn if Windows C: <80 GB free, default)
+- Uses min(WSL free, Windows C: free) as the real constraint — WSL VHDX lives on C:
 
-Never skip this. An unchecked download can fill the WSL disk and corrupt the database.
+Never skip this. An unchecked download can fill the Windows C: drive and corrupt the WSL virtual disk.
 
 ## VRAM — always use vram_manager
 Before any GPU training:
