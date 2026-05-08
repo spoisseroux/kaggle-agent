@@ -1,5 +1,5 @@
 {
-  "active": "titanic",
+  "active": "store-sales-time-series-forecasting",
   "competitions": {
     "titanic": {
       "slug": "titanic",
@@ -7,9 +7,19 @@
       "metric": "accuracy",
       "higher_better": true,
       "deadline": "2030-12-31",
-      "status": "active",
+      "status": "complete",
       "submissions_max": 10,
       "created_at": "2026-05-07T17:18:20.777043Z"
+    },
+    "store-sales-time-series-forecasting": {
+      "slug": "store-sales-time-series-forecasting",
+      "name": "Store Sales - Time Series Forecasting",
+      "metric": "rmsle",
+      "higher_better": false,
+      "deadline": "2030-06-30",
+      "status": "active",
+      "submissions_max": 200,
+      "created_at": "2026-05-08T04:00:00.000000Z"
     }
   }
 }
