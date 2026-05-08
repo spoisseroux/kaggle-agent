@@ -147,7 +147,7 @@ def main():
     print(f"   Monitoring: {DB_PATH}")
     print(f"   Poll interval: {POLL_INTERVAL}s")
 
-    last_msg_count = 0
+    last_processed_ids = set()
     claude_pane = None
     last_pane_check = 0
 
@@ -165,12 +165,15 @@ def main():
             # Check for new messages
             new_messages = get_new_messages()
 
-            if new_messages and len(new_messages) != last_msg_count:
-                print(f"\n📨 {len(new_messages)} new message(s) detected")
+            # Filter to only messages we haven't seen before
+            unprocessed = [msg for msg in new_messages if msg[0] not in last_processed_ids]
+
+            if unprocessed:
+                print(f"\n📨 {len(unprocessed)} new message(s) detected")
 
                 # Calculate delay based on message length
                 # Long pastes need more time for Claude Code to process
-                total_length = sum(len(msg[1]) for msg in new_messages)
+                total_length = sum(len(msg[1]) for msg in unprocessed)
                 if total_length > 1000:
                     delay = 10  # 10 seconds for long messages - Claude needs time
                     print(f"   Long message detected ({total_length} chars) - waiting {delay}s")
@@ -190,13 +193,15 @@ def main():
                         # Mark messages as pending so we don't re-process
                         marked = mark_messages_as_pending()
                         print(f"   Marked {marked} messages as pending")
+
+                        # Remember we processed these messages
+                        for msg in unprocessed:
+                            last_processed_ids.add(msg[0])
                     else:
                         print(f"   ❌ Failed to send Enter")
                 else:
                     print(f"   ❌ No Claude pane found - can't auto-submit")
                     print(f"       Please start Claude Code in tmux session")
-
-                last_msg_count = len(new_messages)
 
             # Sleep before next poll
             time.sleep(POLL_INTERVAL)
