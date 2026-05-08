@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Kaggle leaderboard monitor every hour
+Requires=kaggle-leaderboard-monitor.service
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

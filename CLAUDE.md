@@ -284,6 +284,35 @@ And at phase completion:
 python core/notify.py "✓ {Phase} complete — CV: {score}. Starting {next_phase}."
 ```
 
+## Autonomous research tools
+
+### At competition start (run after Phase 0 research, before Phase 1)
+```bash
+python scripts/ingest_notebooks.py         # download + extract top-5 public notebooks into memory
+python scripts/plan_experiments.py         # Ollama planner designs first experiment batch
+```
+
+### Read at the start of every work cycle
+```bash
+cat .claude/experiment_plan_{slug}.json    # priority-ordered list of what to try next
+cat .claude/last_reflection_{slug}.md      # latest analysis of what's working
+cat .claude/notebook_insights_{slug}.md    # feature ideas from top public notebooks
+```
+
+Execute experiments in priority order from the plan. Tick them off as you go.
+
+### After every 5 experiments OR at phase completion
+```bash
+python scripts/reflect_experiments.py      # Ollama analyses what's working and why
+python scripts/plan_experiments.py         # update experiment plan based on reflection
+```
+
+### Leaderboard
+Monitored automatically every hour via systemd timer — you will get a Telegram
+notification on any rank change. Do NOT poll manually during training runs.
+
+---
+
 ## Public writeups
 After any notable competition result (top 20% LB, or if asked):
 ```bash

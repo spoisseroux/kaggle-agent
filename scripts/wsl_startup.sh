@@ -37,6 +37,9 @@ fi
 # Start the backend file watcher (restarts kaggle-api on source changes)
 sudo -n /bin/systemctl start kaggle-api-watch || true
 
+# Start hourly leaderboard rank monitor
+sudo -n /bin/systemctl start kaggle-leaderboard-monitor.timer || true
+
 python3 core/notify.py "🟢 Agent online — all services started" || true
 
 echo "wsl_startup complete"

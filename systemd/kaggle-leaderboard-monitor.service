@@ -1,0 +1,14 @@
+[Unit]
+Description=Kaggle leaderboard rank monitor (one-shot)
+After=network.target
+
+[Service]
+Type=oneshot
+User=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+ExecStart=/bin/bash -c 'source /home/keehar/kaggle-venv/bin/activate && set -a && [ -f .env ] && source .env && set +a && python scripts/monitor_leaderboard.py'
+StandardOutput=append:/home/keehar/kaggle-agent/logs/leaderboard.log
+StandardError=append:/home/keehar/kaggle-agent/logs/leaderboard.log
+
+[Install]
+WantedBy=multi-user.target
