@@ -36,6 +36,10 @@ if [ -n "$MODEL" ]; then
     MODEL_FLAG=(--model "$MODEL")
 fi
 
+# ── Check Claude auth before starting ────────────────────────────────────────
+# Sends Telegram alert + exits 1 if token expired and refresh failed
+bash "$(dirname "$0")/check_claude_auth.sh" || exit 1
+
 exec claude \
   "${MODEL_FLAG[@]}" \
   --dangerously-skip-permissions \
