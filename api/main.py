@@ -232,6 +232,35 @@ def ssh_info() -> dict:
     }
 
 
+@app.get("/system/hooks")
+def system_hooks() -> dict:
+    """Return installed Claude Code hooks from .claude/settings.json."""
+    settings_path = REPO_ROOT / ".claude" / "settings.json"
+    if not settings_path.exists():
+        return {"hooks": []}
+
+    try:
+        settings = json.loads(settings_path.read_text())
+        hooks_config = settings.get("hooks", {})
+
+        # Flatten hooks structure: { event: [{ matcher, hooks: [...] }] }
+        # into: [{ event, matcher, command }]
+        result = []
+        for event, matchers in hooks_config.items():
+            for matcher_obj in matchers:
+                matcher = matcher_obj.get("matcher", "")
+                for hook in matcher_obj.get("hooks", []):
+                    result.append({
+                        "event": event,
+                        "matcher": matcher,
+                        "command": hook.get("command", ""),
+                    })
+
+        return {"hooks": result}
+    except Exception as e:
+        return {"hooks": [], "error": str(e)}
+
+
 # ---------- model selection ----------
 
 @app.get("/system/model")
