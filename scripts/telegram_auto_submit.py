@@ -37,6 +37,23 @@ def get_new_message_count():
     return count
 
 
+def get_new_messages():
+    """Get unprocessed messages with text"""
+    conn = sqlite3.connect(str(DB_PATH))
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, text
+        FROM messages
+        WHERE role = 'human' AND status = 'new'
+        ORDER BY created_at ASC
+    """)
+
+    messages = cursor.fetchall()
+    conn.close()
+    return messages
+
+
 def find_claude_pane():
     """Find the tmux pane running Claude Code"""
     try:
@@ -122,21 +139,36 @@ def main():
                     print("   ⚠️ Claude pane not found - will retry")
 
             # Check for new messages
-            msg_count = get_new_message_count()
+            new_messages = get_new_messages()
 
-            if msg_count > 0 and msg_count != last_msg_count:
-                print(f"\n📨 {msg_count} new message(s) detected")
+            if new_messages and len(new_messages) != last_msg_count:
+                print(f"\n📨 {len(new_messages)} new message(s) detected")
 
-                # Wait a moment for Claude Code to pre-fill the input
-                time.sleep(1)
+                # Calculate delay based on message length
+                # Long pastes need more time for Claude Code to process
+                total_length = sum(len(msg[1]) for msg in new_messages)
+                if total_length > 1000:
+                    delay = 3  # 3 seconds for long messages
+                    print(f"   Long message detected ({total_length} chars) - waiting {delay}s")
+                else:
+                    delay = 1  # 1 second for short messages
+
+                # Wait for Claude Code to pre-fill the input
+                time.sleep(delay)
 
                 if claude_pane:
                     print(f"   Sending Enter to {claude_pane}...")
 
-                    # Send Enter key
-                    if send_enter_to_pane(claude_pane):
+                    # Send Enter key (twice for long messages to be sure)
+                    success = send_enter_to_pane(claude_pane)
+                    if total_length > 1000 and success:
+                        time.sleep(0.5)
+                        send_enter_to_pane(claude_pane)
+                        print(f"   ✅ Enter sent (2x for long message)")
+                    elif success:
                         print(f"   ✅ Enter sent successfully")
 
+                    if success:
                         # Mark messages as pending so we don't re-process
                         marked = mark_messages_as_pending()
                         print(f"   Marked {marked} messages as pending")
@@ -146,7 +178,7 @@ def main():
                     print(f"   ❌ No Claude pane found - can't auto-submit")
                     print(f"       Please start Claude Code in tmux session")
 
-                last_msg_count = msg_count
+                last_msg_count = len(new_messages)
 
             # Sleep before next poll
             time.sleep(POLL_INTERVAL)
