@@ -1,0 +1,117 @@
+# Experiment pacing and resource limits
+#
+# These limits prevent runaway resource usage while allowing flexibility
+# for different competition types and phases.
+
+# Default limits (can be overridden per-competition)
+defaults:
+  # Experiment count limits
+  max_experiments_per_day: 50        # Daily cap (was 20, increased)
+  max_experiments_per_hour: 10       # Hourly burst limit
+  min_experiment_interval_min: 5     # Minimum time between experiments (reduced from 15)
+
+  # Stopping conditions
+  max_experiments_without_improvement: 8   # Stop if no CV gain after N tries
+  cv_improvement_threshold: 0.0005         # What counts as "improvement"
+
+  # GPU/compute limits
+  max_training_time_per_experiment_min: 30  # Kill training if exceeds this
+  gpu_cooldown_between_experiments_sec: 120  # Cool down time (2 min)
+  max_gpu_temp_celsius: 85                  # Auto-pause if GPU exceeds this
+
+  # Submission limits (conservative by default)
+  auto_submit_enabled: false                # Require human approval by default
+  max_submissions_per_day: 2                # When auto-submit enabled
+  min_hours_between_submissions: 4          # Don't spam leaderboard
+  cv_improvement_required_for_submit: 0.005 # Must beat current best by 0.5%
+
+# Competition-specific overrides
+competition_overrides:
+  # Playground competitions: more relaxed limits for experimentation
+  playground:
+    max_experiments_per_day: 100            # Unlimited-ish for practice
+    min_experiment_interval_min: 3          # Faster iteration
+    max_experiments_without_improvement: 12 # Try more things
+    auto_submit_enabled: true               # Safe to auto-submit
+    max_submissions_per_day: 5              # More submissions OK
+
+  # High-stakes Featured competitions: conservative
+  featured:
+    max_experiments_per_day: 40
+    min_experiment_interval_min: 10         # More careful
+    max_experiments_without_improvement: 6
+    auto_submit_enabled: false              # Always ask first
+    max_submissions_per_day: 2
+    min_hours_between_submissions: 6
+
+  # Research competitions: balanced
+  research:
+    max_experiments_per_day: 60
+    min_experiment_interval_min: 5
+    max_experiments_without_improvement: 10
+    auto_submit_enabled: false
+    max_submissions_per_day: 3
+
+# Adaptive pacing (future enhancement)
+# Adjust limits based on:
+# - Time remaining in competition (more aggressive near deadline)
+# - Recent success rate (if improvements happening, keep going)
+# - Resource availability (scale back if GPU hot or API budget low)
+adaptive:
+  enabled: true
+
+  # As deadline approaches, allow more experiments
+  days_left_thresholds:
+    - days: 7
+      multiplier: 1.5      # 50% more experiments in final week
+    - days: 2
+      multiplier: 2.0      # Double in final 2 days
+    - days: 0.5
+      multiplier: 3.0      # Triple in final 12 hours
+
+  # If on a hot streak (recent improvements), allow burst
+  hot_streak_threshold: 3              # N consecutive improvements
+  hot_streak_multiplier: 1.5           # 50% more experiments
+
+  # Scale back if resources constrained
+  api_budget_critical_threshold: 0.9   # >90% used
+  api_budget_critical_multiplier: 0.3  # Reduce to 30% pace
+
+  gpu_temp_warning_threshold: 80       # °C
+  gpu_temp_warning_multiplier: 0.5     # Reduce to 50% pace
+
+# Per-phase limits (optional)
+# Different phases have different resource needs
+phase_limits:
+  eda:
+    max_experiments: 5                 # EDA isn't about experiments
+    max_time_min: 30
+
+  baseline:
+    max_experiments: 3                 # Just get something working
+    max_time_min: 60
+
+  feature_engineering:
+    max_experiments: 25                # Main exploration phase
+    max_time_min: 480                  # 8 hours max
+
+  model_selection:
+    max_experiments: 15                # Try different model types
+    max_time_min: 360
+
+  tuning:
+    max_experiments: 30                # Hyperparameter search
+    max_time_min: 720                  # 12 hours max (e.g., Optuna overnight)
+
+  ensembling:
+    max_experiments: 10                # Combine top models
+    max_time_min: 120
+
+# Emergency stop conditions
+# If any of these trigger, pause immediately and notify human
+emergency_stop:
+  max_consecutive_errors: 5            # Errors in a row
+  max_error_rate: 0.5                  # >50% of experiments erroring
+  api_rate_limit_hits: 3               # Hit rate limit N times
+  gpu_thermal_throttle_detected: true  # GPU reducing clocks due to heat
+  disk_space_mb: 1000                  # <1GB disk space remaining
