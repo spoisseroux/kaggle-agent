@@ -7,10 +7,15 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import fcntl
 import json
 import os
+import pty
+import select
+import struct
 import subprocess
 import sys
+import termios
 from pathlib import Path
 from typing import Any
 
@@ -460,54 +465,77 @@ async def chat_ws(ws: WebSocket) -> None:
         return
 
 
+def _set_winsize(fd: int, cols: int, rows: int) -> None:
+    """Push a TIOCSWINSZ ioctl so the PTY (and tmux) know the terminal size."""
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+
+
+def _read_fd(fd: int) -> bytes:
+    """Non-blocking read from PTY master — returns b"" if nothing ready."""
+    r, _, _ = select.select([fd], [], [], 0.5)
+    return os.read(fd, 4096) if r else b""
+
+
 @app.websocket("/terminal/ws")
 async def terminal_ws(ws: WebSocket) -> None:
-    """Stream live tmux pane output; relay client keystrokes into the pane."""
-    await ws.accept()
-    try:
-        while True:
-            # Poll for output and handle any pending input concurrently
-            try:
-                client_payload = await asyncio.wait_for(ws.receive_text(), timeout=0.5)
-                data = json.loads(client_payload)
-                if data.get("type") == "input":
-                    keys = data.get("data", "")
-                    if keys:
-                        subprocess.run(
-                            ["tmux", "send-keys", "-t", "kaggle-agent", keys],
-                            capture_output=True, timeout=2,
-                        )
-            except asyncio.TimeoutError:
-                pass
-            except WebSocketDisconnect:
-                return
+    """Full PTY terminal over WebSocket — attaches to the kaggle-agent tmux session.
 
-            # Capture and send current pane output
-            try:
-                r = subprocess.run(
-                    ["tmux", "capture-pane", "-p", "-t", "kaggle-agent", "-e"],
-                    capture_output=True, text=True, timeout=2,
-                )
-                if r.returncode == 0:
-                    await ws.send_text(json.dumps({
-                        "type": "output",
-                        "data": r.stdout,
-                        "ts": dt.datetime.utcnow().isoformat() + "Z"
-                    }))
-                else:
-                    await ws.send_text(json.dumps({
-                        "type": "status",
-                        "data": "session offline",
-                        "ts": dt.datetime.utcnow().isoformat() + "Z"
-                    }))
-            except Exception as e:
+    Protocol (client → server):
+      {"type": "input",  "data": "<keystrokes>"}
+      {"type": "resize", "cols": 220, "rows": 30}
+
+    Protocol (server → client):
+      {"type": "output", "data": "<utf-8 string>"}
+    """
+    await ws.accept()
+
+    master_fd, slave_fd = pty.openpty()
+    _set_winsize(master_fd, 220, 30)  # sensible default before first resize
+
+    # -A: attach if kaggle-agent exists, create otherwise — safe either way
+    proc = subprocess.Popen(
+        ["tmux", "new-session", "-A", "-s", "kaggle-agent"],
+        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        close_fds=True, preexec_fn=os.setsid,
+    )
+    os.close(slave_fd)
+
+    loop = asyncio.get_event_loop()
+    stop = asyncio.Event()
+
+    async def pty_to_ws() -> None:
+        """Forward PTY output → WebSocket."""
+        while not stop.is_set():
+            data = await loop.run_in_executor(None, _read_fd, master_fd)
+            if data:
                 await ws.send_text(json.dumps({
-                    "type": "error",
-                    "data": str(e),
-                    "ts": dt.datetime.utcnow().isoformat() + "Z"
+                    "type": "output",
+                    "data": data.decode("utf-8", errors="replace"),
                 }))
-    except WebSocketDisconnect:
-        return
+
+    async def ws_to_pty() -> None:
+        """Forward WebSocket input → PTY (keystrokes + resize events)."""
+        try:
+            while True:
+                raw = await ws.receive_text()
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    os.write(master_fd, msg["data"].encode())
+                elif msg.get("type") == "resize":
+                    _set_winsize(master_fd, int(msg["cols"]), int(msg["rows"]))
+        except WebSocketDisconnect:
+            pass
+        finally:
+            stop.set()
+
+    try:
+        await asyncio.gather(pty_to_ws(), ws_to_pty())
+    finally:
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+        proc.terminate()
 
 
 # ---------- ollama / memory ----------
