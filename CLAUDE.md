@@ -100,30 +100,44 @@ Call: `python core/ask_human.py "Your question here"`
 - Any action that cannot be undone
 
 ### Mandatory submission flow
-When models are ready and you want to submit, ALWAYS do this:
+
+Rules:
+- ask_human.py IS the Telegram message — never send a separate notify.py
+  saying "I asked via Telegram" or "waiting for your decision". That is
+  redundant and confusing. The ask IS the message.
+- Never run ask_human.py as a background task — it consumes unrelated
+  messages as fake replies. Always run it synchronously (no &, no background).
+- Include the actual options IN the ask_human.py call. Do not send options
+  separately via notify.py.
+
+Correct pattern:
 ```python
-# Never just print options to the terminal — user cannot see it
-# Never run ask_human.py as a background task — it will consume
-# unrelated messages as fake replies
 import subprocess
 result = subprocess.run(
     ["python", "core/ask_human.py",
-     "Ready to submit. Options:\n"
-     "1) xgb_v1_submission.csv  CV: 0.321 (recommended)\n"
-     "2) lgbm_optuna.csv  CV: 0.340\n"
-     "3) ensemble.csv  blend\n"
-     "Which number, or 'wait' to keep optimizing?"],
+     "Ready to submit. Which option?\n\n"
+     "1) XGBoost v2 with fixed lags  CV: 0.321 (recommended)\n"
+     "2) LightGBM Optuna  CV: 0.340\n"
+     "3) Keep optimizing first\n\n"
+     "Reply with 1, 2, or 3."],
     capture_output=True, text=True
-    # NO timeout= here — wait as long as needed
 )
 choice = result.stdout.strip()
+# Now act on choice — do not proceed without a reply
 ```
-Only after receiving a reply do you proceed.
 
-> **NOTE on filenames:** Telegram destroys underscores in Markdown mode.
-> When listing filenames or scores in messages, use spaces or dashes
-> instead of underscores: `xgb-v2-fixed-lags.csv` not `xgb_v2_fixed_lags.csv`.
-> Or just describe: "XGBoost v2 with fixed lags".
+Wrong patterns (never do these):
+```python
+# WRONG — narrates instead of asking
+notify("Asked for submission approval via Telegram. Waiting for your decision.")
+
+# WRONG — background task consumes unrelated messages as the reply
+subprocess.Popen(["python", "core/ask_human.py", "..."])
+
+# WRONG — sends options separately then asks empty question
+notify("Options:\n1) ...\n2) ...")
+ask_human("Which one?")
+```
 
 ## Downloads — always use download_guard
 Before downloading ANY dataset, model, or large file:
