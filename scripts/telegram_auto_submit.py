@@ -172,46 +172,26 @@ def main():
                 # Long pastes need more time for Claude Code to process
                 total_length = sum(len(msg[1]) for msg in new_messages)
                 if total_length > 1000:
-                    delay = 6  # 6 seconds for long messages (Claude needs time to process paste)
+                    delay = 10  # 10 seconds for long messages - Claude needs time
                     print(f"   Long message detected ({total_length} chars) - waiting {delay}s")
                 else:
-                    delay = 1  # 1 second for short messages
+                    delay = 2  # 2 seconds for short messages (was 1, but be safer)
 
                 # Wait for Claude Code to pre-fill the input
                 time.sleep(delay)
 
                 if claude_pane:
-                    # Extract session name from pane (format: session:window.pane)
-                    session_name = claude_pane.split(':')[0]
+                    print(f"   Sending Enter to {claude_pane}...")
 
-                    # Check if session is attached
-                    if is_session_attached(session_name):
-                        print(f"   ⚠️  Session '{session_name}' is attached - skipping auto-submit")
-                        print(f"       (tmux send-keys doesn't work reliably when user is inside)")
-                        print(f"       User will press Enter manually")
-                        # Don't mark as pending - leave as 'new' so user sees it
+                    # Send Enter key - just once, but after long delay
+                    success = send_enter_to_pane(claude_pane)
+                    if success:
+                        print(f"   ✅ Enter sent successfully")
+                        # Mark messages as pending so we don't re-process
+                        marked = mark_messages_as_pending()
+                        print(f"   Marked {marked} messages as pending")
                     else:
-                        print(f"   Sending Enter to {claude_pane}...")
-
-                        # Send Enter key (multiple times for long messages to be sure)
-                        success = send_enter_to_pane(claude_pane)
-                        if total_length > 1000 and success:
-                            # For long messages, send Enter 3 times with 1s gaps
-                            # This handles cases where Claude shows paste preview or needs confirmation
-                            time.sleep(1)
-                            send_enter_to_pane(claude_pane)
-                            time.sleep(1)
-                            send_enter_to_pane(claude_pane)
-                            print(f"   ✅ Enter sent (3x for long message)")
-                        elif success:
-                            print(f"   ✅ Enter sent successfully")
-
-                        if success:
-                            # Mark messages as pending so we don't re-process
-                            marked = mark_messages_as_pending()
-                            print(f"   Marked {marked} messages as pending")
-                        else:
-                            print(f"   ❌ Failed to send Enter")
+                        print(f"   ❌ Failed to send Enter")
                 else:
                     print(f"   ❌ No Claude pane found - can't auto-submit")
                     print(f"       Please start Claude Code in tmux session")
