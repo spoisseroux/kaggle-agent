@@ -199,8 +199,16 @@ Write it the same way you'd write it if the terminal didn't exist:
 - Full answer to their question
 - What you found / what happened / what's scheduled
 - What you're doing next (if anything)
-- Format for Telegram: use emoji instead of markdown headers, plain text,
-  keep each message under ~3000 chars (notify.py auto-splits longer messages)
+- Format for Telegram — strict rules:
+  - Telegram does NOT render Markdown. No **bold**, no _italic_, no `backticks`.
+    They show as literal asterisks/underscores/backticks — ugly and confusing.
+  - Use a single emoji at the very start of the message as the subject/header.
+  - Never put emojis on numbered list items (1️⃣ 2️⃣ etc) — confusing to read.
+  - For options/choices, use plain numbers: "1) ...\n2) ...\n3) ..."
+  - For filenames and scores, write them plainly: "XGBoost v2, CV: 0.321"
+    (underscores in filenames like xgb_v2.csv get eaten by Telegram even in
+    plain text mode if Markdown is on — we removed parse_mode so this is fixed)
+  - Keep each message under ~3000 chars (notify.py auto-splits longer messages)
 
 Bad:  `python core/notify.py "⏰ Scheduled midnight submission."`
 Good: `python core/notify.py """⏰ Scheduled midnight UTC submission (8:00 PM EDT, ~51 min).
