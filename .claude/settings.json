@@ -13,6 +13,13 @@
     "deny": []
   },
   "hooks": {
+    "PreCompact": [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "python scripts/hooks/pre_compact.py"
+      }]
+    }],
     "Stop": [{
       "matcher": "",
       "hooks": [{

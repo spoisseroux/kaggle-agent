@@ -178,14 +178,52 @@ If you hit an Anthropic rate limit error (429 / RateLimitError):
 4. If limits persist >30 min, notify and pause: `python core/ask_human.py "Rate limits are blocking progress for 30+ min. Switch to haiku model or wait?"`
 
 ## Local LLM — use Ollama aggressively to save API credits
-Ollama (qwen3:14b) is free and already running. Shift as much work as possible:
-- ALL boilerplate code generation → Ollama
-- Feature implementation once the approach is decided → Ollama
-- Summarising experiment results → Ollama
-- Debugging obvious errors (syntax, import, shape mismatches) → Ollama
-- Writing tests, docstrings, configs → Ollama
-Reserve Claude (this model) for: choosing strategy, interpreting surprising
-results, designing the experiment plan, and ask_human decisions.
+Ollama (qwen3:14b) is free and already running. Every token you use costs money.
+
+Use Ollama for ALL of these without exception:
+- Boilerplate code (training loops, CV scaffolds, sklearn pipelines, data loaders)
+- Feature engineering implementation (once you've decided what to build)
+- Debugging syntax/import/shape errors — paste the error and fix it locally
+- Summarising experiment results into one sentence
+- Generating docstrings, comments, config files, shell scripts
+- Writing tests and validation code
+- Reading and summarising long files before deciding if they're relevant
+- Drafting the first version of any script; review it yourself after
+
+Reserve Claude (this model) ONLY for:
+- Deciding which approach to try next
+- Interpreting surprising or unexpected results
+- Architecture and strategy decisions
+- ask_human() calls
+- Anything that requires genuine reasoning across the full competition context
+
+## Context and cost management
+Claude Code token usage is expensive. Actively manage context size:
+- Read files with `head`/`tail`/`grep` instead of full reads unless you need the whole file
+- Query MLflow for top-N experiments, not the full history
+- Summarise completed phases with Ollama before continuing (keeps context tight)
+- Before any long operation (>30 min), use `/compact` to free context space
+- After compaction, re-read CLAUDE.md and competition CLAUDE.md — you'll have forgotten them
+- The PreCompact hook auto-saves state to Postgres memory before compaction fires;
+  read it back with: `python -c "from core.memory_utils import get_last_checkpoint; print(get_last_checkpoint())"`
+
+## Session start / post-compaction recovery
+At the start of every session OR immediately after context compaction:
+1. Read `competitions/registry.json` for active competition
+2. Read `competitions/active/<slug>/CLAUDE.md`
+3. Query Postgres memory for last checkpoint:
+   ```bash
+   python -c "
+   import os, psycopg2, json
+   conn = psycopg2.connect(os.environ['POSTGRES_DSN'])
+   cur = conn.cursor()
+   cur.execute(\"SELECT title, body FROM memories WHERE type='session_checkpoint' ORDER BY created_at DESC LIMIT 1\")
+   row = cur.fetchone()
+   print(row[1] if row else 'No checkpoint found')
+   "
+   ```
+4. Send notify: `python core/notify.py "🔄 Session resumed — reading competition context..."`
+5. Check `get_pending_instructions()` for any queued messages
 
 ## Documentation (mandatory)
 When you create a file: add a section to the relevant `docs/` file.
@@ -208,6 +246,53 @@ git push
 Never commit: `.env`, `data/`, `mlruns/`, `*.csv`, `*.parquet`, `*.pt`, `*.pkl`.
 These are in `.gitignore` — leave them there.
 
+## Phase transition notifications (mandatory)
+Send a Telegram notify at the START of every major phase so the user always
+knows what's happening without opening the terminal:
+
+```python
+# Phase 0 — research
+python core/notify.py "🔍 Starting research phase for {slug} — checking leaderboard, public notebooks (~15 min)"
+
+# Phase 1 — EDA
+python core/notify.py "📊 EDA started — exploring data shape, distributions, missing values"
+
+# Phase 2 — data pipeline
+python core/notify.py "🔧 Running data pipeline (refine → enrich → synthetic → fuzz) — ~10 min"
+
+# Phase 3 — baseline
+python core/notify.py "📐 Building baseline model — first end-to-end submission target"
+
+# Phase 4 — feature engineering
+python core/notify.py "⚙️ Feature engineering: trying {description} — ~{eta}"
+
+# Phase 5 — training
+python core/notify.py "🏋 Training {model} on GPU — ~{eta}. Will send CV when done."
+
+# Phase 6 — tuning
+python core/notify.py "🎛 Optuna tuning {model} — {n_trials} trials, ~{eta}"
+
+# Phase 7 — ensembling
+python core/notify.py "🔀 Ensembling top-{n} models — ~5 min"
+
+# Phase 8 — submission ready
+python core/notify.py "✅ Ready to submit — CV: {score}. Asking for approval..."
+```
+
+And at phase completion:
+```python
+python core/notify.py "✓ {Phase} complete — CV: {score}. Starting {next_phase}."
+```
+
+## Public writeups
+After any notable competition result (top 20% LB, or if asked):
+```bash
+python scripts/generate_writeup.py --competition {slug}
+```
+Reviews the MLflow experiment history and uses Ollama to draft a Kaggle
+notebook writeup. Edit the output in `writeups/` before publishing.
+Add to CLAUDE.md for the competition when a writeup is generated.
+
 ## Rules
 - Always log to MLflow before and after training
 - Never delete `submissions/` contents
@@ -215,3 +300,4 @@ These are in `.gitignore` — leave them there.
 - Data lives in `data/<slug>/` — never commit it
 - Training >30min → send notify at start
 - `KAGGLE_KEY` + `KAGGLE_USERNAME` env vars only — never use `kaggle.json`
+- One Kaggle submission per explicit human approval — no exceptions
