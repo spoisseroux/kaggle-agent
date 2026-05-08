@@ -399,13 +399,17 @@ def _fmt_submission(r: dict) -> dict:
 
 @app.get("/experiments")
 def experiments(competition: str | None = None, limit: int = 50) -> dict:
-    rows = memory.list_experiments(competition, limit=limit)
+    # competition=all or omitted → return everything
+    slug = None if (not competition or competition == "all") else competition
+    rows = memory.list_experiments(slug, limit=limit)
     return {"experiments": [_fmt_experiment(r) for r in rows]}
 
 
 @app.get("/submissions")
 def submissions(competition: str | None = None, limit: int = 50) -> dict:
-    rows = memory.list_submissions(competition, limit=limit)
+    # competition=all or omitted → return everything
+    slug = None if (not competition or competition == "all") else competition
+    rows = memory.list_submissions(slug, limit=limit)
     return {"submissions": [_fmt_submission(r) for r in rows]}
 
 
@@ -572,9 +576,24 @@ def _set_winsize(fd: int, cols: int, rows: int) -> None:
 
 
 def _read_fd(fd: int) -> bytes:
-    """Non-blocking read from PTY master — returns b"" if nothing ready."""
-    r, _, _ = select.select([fd], [], [], 0.5)
-    return os.read(fd, 4096) if r else b""
+    """Non-blocking read from PTY master.
+
+    Returns b"" when nothing is ready within 0.5 s.
+    Returns b"" and sets errno to EIO when the slave side closes — the
+    caller must treat an empty return with EIO as EOF, not an error.
+    Raises only for genuine unexpected errors.
+    """
+    import errno as _errno
+    try:
+        r, _, _ = select.select([fd], [], [], 0.5)
+        if not r:
+            return b""
+        return os.read(fd, 4096)
+    except OSError as e:
+        if e.errno == _errno.EIO:
+            # Slave PTY closed (tmux exited / detached) — signal EOF
+            return b"\x00"   # sentinel: caller checks for this
+        raise
 
 
 @app.websocket("/terminal/ws")
@@ -587,27 +606,42 @@ async def terminal_ws(ws: WebSocket) -> None:
 
     Protocol (server → client):
       {"type": "output", "data": "<utf-8 string>"}
+      {"type": "disconnect"}   ← sent when the tmux session ends
     """
     await ws.accept()
 
-    master_fd, slave_fd = pty.openpty()
-    _set_winsize(master_fd, 220, 30)  # sensible default before first resize
+    try:
+        master_fd, slave_fd = pty.openpty()
+        _set_winsize(master_fd, 220, 30)  # sensible default before first resize
 
-    # -A: attach if kaggle-agent exists, create otherwise — safe either way
-    proc = subprocess.Popen(
-        ["tmux", "new-session", "-A", "-s", "kaggle-agent"],
-        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-        close_fds=True, preexec_fn=os.setsid,
-    )
-    os.close(slave_fd)
+        # attach-session is more reliable than new-session -A when the session
+        # already exists; TERM must be set or tmux exits immediately.
+        env = os.environ.copy()
+        env.setdefault("TERM", "xterm-256color")
+        proc = subprocess.Popen(
+            ["tmux", "attach-session", "-t", "kaggle-agent"],
+            stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+            close_fds=True, preexec_fn=os.setsid,
+            env=env,
+        )
+        os.close(slave_fd)
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error("Terminal PTY setup failed: %s", e, exc_info=True)
+        await ws.close(4000)
+        return
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()   # get_event_loop() is deprecated in 3.10+
     stop = asyncio.Event()
 
     async def pty_to_ws() -> None:
-        """Forward PTY output → WebSocket."""
+        """Forward PTY output → WebSocket. Stops on EIO (tmux exited)."""
         while not stop.is_set():
             data = await loop.run_in_executor(None, _read_fd, master_fd)
+            if data == b"\x00":          # EIO sentinel — slave closed
+                await ws.send_text(json.dumps({"type": "disconnect"}))
+                stop.set()
+                break
             if data:
                 await ws.send_text(json.dumps({
                     "type": "output",
@@ -617,7 +651,7 @@ async def terminal_ws(ws: WebSocket) -> None:
     async def ws_to_pty() -> None:
         """Forward WebSocket input → PTY (keystrokes + resize events)."""
         try:
-            while True:
+            while not stop.is_set():
                 raw = await ws.receive_text()
                 msg = json.loads(raw)
                 if msg.get("type") == "input":
@@ -625,6 +659,8 @@ async def terminal_ws(ws: WebSocket) -> None:
                 elif msg.get("type") == "resize":
                     _set_winsize(master_fd, int(msg["cols"]), int(msg["rows"]))
         except WebSocketDisconnect:
+            pass
+        except OSError:
             pass
         finally:
             stop.set()
@@ -636,7 +672,10 @@ async def terminal_ws(ws: WebSocket) -> None:
             os.close(master_fd)
         except OSError:
             pass
-        proc.terminate()
+        try:
+            proc.terminate()
+        except Exception:
+            pass
 
 
 # ---------- ollama / memory ----------
