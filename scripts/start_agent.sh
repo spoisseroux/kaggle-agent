@@ -49,3 +49,7 @@ exec claude \
    Read CLAUDE.md for full instructions.
    Check the ai-memory MCP for context from last session.
    Resume from where you left off."
+
+# Start auto-submit daemon
+echo "Starting telegram auto-submit daemon..."
+/home/keehar/kaggle-agent/scripts/start_auto_submit.sh

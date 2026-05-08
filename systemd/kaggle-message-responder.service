@@ -1,0 +1,18 @@
+[Unit]
+Description=Kaggle Agent Auto-Responder
+After=network.target
+
+[Service]
+Type=simple
+User=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+Environment="ANTHROPIC_API_KEY=%ANTHROPIC_API_KEY%"
+Environment="POSTGRES_DSN=%POSTGRES_DSN%"
+Environment="TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN%"
+Environment="TELEGRAM_CHAT_ID=%TELEGRAM_CHAT_ID%"
+ExecStart=/home/keehar/kaggle-venv/bin/python /home/keehar/kaggle-agent/scripts/message_auto_responder.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
