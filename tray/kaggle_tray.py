@@ -6,7 +6,10 @@ Windows) and exposes pause / resume / stop in the tray menu.
 
 Icon
 ----
-A simple "K" letter on a coloured rounded square:
+Loads tray/icon.png as the base image if present (drop your favicon there).
+Falls back to a "K" letter on a rounded square.
+
+A state dot with a soft glow is drawn in the top-left corner in every case:
     green  → running
     yellow → paused
     gray   → stopped
@@ -29,11 +32,12 @@ import subprocess
 import threading
 import time
 import webbrowser
+from pathlib import Path
 from typing import Optional
 
 import pystray
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 API_BASE = "http://localhost:8765"
 DASHBOARD_URL = "https://kaggle-ui.nnaq.net"
@@ -42,6 +46,12 @@ HTTP_TIMEOUT = 4
 ACTION_TIMEOUT = 20
 
 ICON_SIZE = 64
+ICON_FILE = Path(__file__).parent / "icon.png"
+
+# Dot geometry (top-left corner indicator)
+DOT_RADIUS = 9          # dot circle radius in px
+DOT_CENTER = (13, 13)   # center of dot (leaves 4px margin from corner)
+GLOW_RADIUS = 14        # how far the soft glow extends
 
 # Name of the Windows Task Scheduler task that runs wsl_startup.sh at logon.
 # Change this to match whatever name was used when the task was created.
@@ -75,23 +85,111 @@ STAGE_LABELS = {
 }
 
 
+def _draw_glow_dot(img: Image.Image, colour: tuple) -> None:
+    """Draw a soft-glowing coloured dot in the top-left corner of *img* (RGBA).
+
+    Two layers are composited:
+    1. A blurred glow halo at full dot radius + GLOW_RADIUS
+    2. A crisp filled circle on top at DOT_RADIUS
+    Both are drawn on transparent scratch canvases so they don't bleed into
+    the icon background.
+    """
+    cx, cy = DOT_CENTER
+    r, g, b = colour[:3]
+
+    # --- glow layer ---
+    glow_size = GLOW_RADIUS * 2 + 4
+    glow = Image.new("RGBA", (glow_size, glow_size), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    # Draw a slightly large circle that will be blurred outward
+    gr = GLOW_RADIUS - 2
+    gc = glow_size // 2
+    gd.ellipse(
+        (gc - gr, gc - gr, gc + gr, gc + gr),
+        fill=(r, g, b, 180),
+    )
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=5))
+    # Paste glow centred on dot position
+    gx = cx - glow_size // 2
+    gy = cy - glow_size // 2
+    img.paste(glow, (gx, gy), glow)
+
+    # --- crisp dot layer ---
+    dot = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(dot)
+    # White border ring (2 px)
+    dd.ellipse(
+        (cx - DOT_RADIUS - 2, cy - DOT_RADIUS - 2,
+         cx + DOT_RADIUS + 2, cy + DOT_RADIUS + 2),
+        fill=(255, 255, 255, 220),
+    )
+    # Coloured fill
+    dd.ellipse(
+        (cx - DOT_RADIUS, cy - DOT_RADIUS,
+         cx + DOT_RADIUS, cy + DOT_RADIUS),
+        fill=(r, g, b, 255),
+    )
+    img.paste(dot, (0, 0), dot)
+
+
 def _make_icon_image(state: str) -> Image.Image:
+    """Build the 64×64 tray icon for *state*.
+
+    Base layer
+    ----------
+    If ``tray/icon.png`` exists (drop your favicon there) it is loaded and
+    scaled to ICON_SIZE.  Otherwise a "K" letter on a dark rounded square is
+    used as the fallback.
+
+    State dot
+    ---------
+    A coloured dot with a soft glow is drawn in the **top-left corner**:
+        green  → running
+        yellow → paused
+        gray   → stopped
+        blue   → transitioning
+        red    → offline / API unreachable
+    """
     colour = COLOURS.get(state, COLOURS["transitioning"])
-    img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle((4, 4, ICON_SIZE - 4, ICON_SIZE - 4), radius=12, fill=colour)
-    font = None
-    for candidate in ("arialbd.ttf", "arial.ttf", "segoeuib.ttf", "DejaVuSans-Bold.ttf"):
+
+    # ── base layer ──────────────────────────────────────────────────────────
+    if ICON_FILE.exists():
         try:
-            font = ImageFont.truetype(candidate, 44)
-            break
-        except OSError:
-            continue
-    if font is None:
-        font = ImageFont.load_default()
-    d.text((ICON_SIZE / 2, ICON_SIZE / 2 + 1), "K",
-           fill="white", font=font, anchor="mm")
-    return img
+            base = Image.open(ICON_FILE).convert("RGBA")
+            base = base.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+        except Exception:
+            base = None
+    else:
+        base = None
+
+    if base is None:
+        # Fallback: dark rounded square with "K"
+        base = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
+        d = ImageDraw.Draw(base)
+        d.rounded_rectangle(
+            (4, 4, ICON_SIZE - 4, ICON_SIZE - 4),
+            radius=12,
+            fill=(40, 44, 52, 255),   # dark background suits any dot colour
+        )
+        font = None
+        for candidate in ("arialbd.ttf", "arial.ttf", "segoeuib.ttf",
+                          "DejaVuSans-Bold.ttf"):
+            try:
+                font = ImageFont.truetype(candidate, 40)
+                break
+            except OSError:
+                continue
+        if font is None:
+            font = ImageFont.load_default()
+        d.text(
+            (ICON_SIZE / 2, ICON_SIZE / 2 + 2), "K",
+            fill="white", font=font, anchor="mm",
+        )
+
+    # ── state dot ───────────────────────────────────────────────────────────
+    _draw_glow_dot(base, colour)
+
+    return base
 
 
 def _schtasks_query(task_name: str) -> Optional[bool]:
