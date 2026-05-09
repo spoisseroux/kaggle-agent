@@ -1,0 +1,76 @@
+name: ai-memory-stack
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: claude-memory-postgres
+    environment:
+      POSTGRES_DB: claude_memory
+      POSTGRES_USER: claude
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - /opt/docker-config/claude-memory/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claude -d claude_memory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: claude-memory-qdrant
+    volumes:
+      - /opt/docker-config/claude-memory/qdrant:/qdrant/storage
+    ports:
+      - "6333:6333"
+    restart: unless-stopped
+
+  mcp:
+    image: claude-memory-mcp:latest
+    container_name: claude-memory-mcp
+    environment:
+      POSTGRES_DSN: postgresql://claude:${POSTGRES_PASSWORD}@postgres:5432/claude_memory
+      QDRANT_URL: http://qdrant:6333
+      BEARER_TOKEN: ${BEARER_TOKEN}
+      HF_HOME: /models
+    volumes:
+      - model_cache:/models
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  deepeval:
+    build:
+      context: ./deepeval-service
+      dockerfile: Dockerfile
+    container_name: claude-deepeval
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  model_cache:

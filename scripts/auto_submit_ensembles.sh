@@ -40,11 +40,14 @@ sleep 30
 # Get latest submissions
 kaggle competitions submissions -c store-sales-time-series-forecasting | head -10 > /tmp/submissions.txt
 
+# Run analysis script
+python scripts/analyze_submission_results.py > /tmp/analysis.txt 2>&1
+
 # Send results
 python core/notify.py "📊 Submission Results:
 
 $(cat /tmp/submissions.txt)
 
-Analyzing results and planning next experiments..."
+$(cat /tmp/analysis.txt)"
 
 echo "Auto-submit complete"
