@@ -134,6 +134,16 @@ Return ONLY the JSON object, no other text.
         comp_info["competition_slug"] = competition_slug
         comp_info["data_dir"] = str(data_dir)
 
+        # Ensure required fields exist
+        comp_info.setdefault("problem_type", "unknown")
+        comp_info.setdefault("eval_metric", "unknown")
+        comp_info.setdefault("data_shape", {})
+        comp_info.setdefault("features", [])
+        comp_info.setdefault("target_info", {})
+        comp_info.setdefault("known_issues", [])
+        comp_info.setdefault("winning_approaches", [])
+        comp_info.setdefault("summary", "")
+
         log.info(f"Reader complete: {comp_info['problem_type']}, metric: {comp_info['eval_metric']}")
 
         return comp_info
