@@ -93,6 +93,46 @@ result = run_multi_agent("competition-slug", start_phase=1, end_phase=3)
 
 See `docs/autokaggle_integration_design.md` for full architecture details.
 
+### Hybrid Mode (RECOMMENDED - automatic mode switching)
+Intelligently switches between single-agent and multi-agent modes based on task complexity and API usage.
+
+```python
+from core.hybrid_orchestrator import decide_and_execute, get_usage_report
+
+# Automatic mode selection
+result = decide_and_execute(user_input, competition_slug="store-sales", phase=4)
+
+# Check usage and recent decisions
+print(get_usage_report())
+```
+
+**Decision logic:**
+1. **API Rate Limits** (highest priority)
+   - Approaching token limits (>70%) → multi-agent mode
+   - Approaching request limits (>80%) → multi-agent mode
+   - Actually rate-limited → queue work, wait, use multi-agent when resuming
+
+2. **Task Complexity** (automatic classification)
+   - **Quick tasks** (single-agent): debug, fix, explain, analyze, status checks
+   - **Complex tasks** (multi-agent): build, implement, full workflows, feature engineering iterations
+
+3. **Smart waiting**
+   - If rate-limited, automatically waits for reset (with progress updates)
+   - Queues pending work
+   - Resumes autonomously when limits clear
+
+**Benefits:**
+- No manual mode switching - always optimal
+- Proactive API usage management
+- Graceful handling of rate limits
+- Cost-efficient by default
+
+**Usage tracking:**
+All API calls are tracked automatically. View current usage:
+```bash
+python -c "from core.usage_tracker import get_tracker; print(get_tracker().get_usage_summary())"
+```
+
 ## Local LLM routing (cost optimisation)
 Use Ollama (`qwen3:14b` via `core/ollama_client.py`) for:
 - Boilerplate training loops, CV scaffolds, sklearn pipelines
