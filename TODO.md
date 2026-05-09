@@ -32,14 +32,16 @@
 - [ ] **New Skills**
   - [x] `/eval` - Run DeepEval metrics on experiment ✅ COMPLETE
   - [x] `/search-similar` - Semantic code search ✅ COMPLETE
-  - [ ] `/replay` - Re-execute experiment with changes
+  - [x] `/replay` - Re-execute experiment with changes ✅ COMPLETE
   - Time: 1-2 hours per skill
 
-- [ ] **Study AutoKaggle Architecture**
-  - Review multi-agent approach (5 specialized agents)
-  - Compare: Reader, Planner, Developer, Reviewer, Summarizer
-  - Consider adopting vs current single-agent design
-  - Time: 2-3 hours research + design doc
+- [x] **Study AutoKaggle Architecture** ✅ COMPLETE
+  - Reviewed multi-agent approach (5 specialized agents)
+  - Compared: Reader, Planner, Developer, Reviewer, Summarizer
+  - Integration design doc created: docs/autokaggle_integration_design.md
+  - Hybrid architecture preserves existing + adds agents
+  - 67% API cost reduction via Ollama offloading
+  - Time: 3 hours research + comprehensive design doc
 
 ## Lower Priority
 
@@ -79,4 +81,4 @@
 
 ---
 
-Last updated: 2026-05-09
+Last updated: 2026-05-08

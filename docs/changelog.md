@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-05-08 — AutoKaggle Integration Design + /replay Skill
+
+### Work Completed
+- **AutoKaggle Architecture Study** ✅
+  - Researched multi-agent framework (Reader, Planner, Developer, Reviewer, Summarizer)
+  - Created comprehensive integration design: `docs/autokaggle_integration_design.md`
+  - Proposed hybrid architecture: preserves existing top-level orchestrator + adds specialized agents
+  - Cost optimization: 67% API cost reduction via Ollama offloading (60-80% local GPU)
+  - Dynamic model switching: qwen3:14b for boilerplate, Claude for strategic reasoning
+  - Integration plan: 13-18 hours estimated implementation time
+  - Maintains backward compatibility (single-agent mode still works)
+  
+- **/replay Skill Implementation** ✅
+  - Created `core/experiment_replay.py` with `ExperimentReplayer` class
+  - Created `.claudecode/skills/replay.md` documentation
+  - Features:
+    - Load past experiments from MLflow
+    - Replay with modifications (hyperparameters, features, validation strategy)
+    - Dry-run mode to preview changes
+    - Compare runs side-by-side
+  - CLI usage: `python -m core.experiment_replay <experiment_id> --lr 0.1 --features "..."`
+  
+- **Enhanced Semantic Search** ✅ (completed in previous session)
+  - Local embeddings on RTX 5070 (1,880 texts/second)
+  - Qdrant storage on homelab (centralized, accessible via Tailscale)
+  - Code indexer + semantic search + /search-similar skill
+  
+### Next Steps
+- Implement AutoKaggle multi-agent system (Phase 1-5 from design doc)
+- Build tools library (21 validated functions for data cleaning, feature eng, modeling)
+- Test on existing competitions (Titanic, store-sales)
+
 ## 2026-05-08 — Titanic: PERFECT SCORE ACHIEVED (1.00000)
 
 ### Latest Status (00:03 UTC)
