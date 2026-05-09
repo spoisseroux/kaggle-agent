@@ -1,89 +1,17 @@
 {
-  "problem_type": "classification",
-  "eval_metric": "accuracy",
-  "data_shape": {
-    "train_rows": 10,
-    "train_cols": 12,
-    "test_rows": 5
-  },
-  "features": [
-    {
-      "name": "PassengerId",
-      "type": "numeric",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Survived",
-      "type": "numeric",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Pclass",
-      "type": "categorical",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Name",
-      "type": "text",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Sex",
-      "type": "categorical",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Age",
-      "type": "numeric",
-      "missing_pct": 0.2
-    },
-    {
-      "name": "SibSp",
-      "type": "numeric",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Parch",
-      "type": "numeric",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Ticket",
-      "type": "text",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Fare",
-      "type": "numeric",
-      "missing_pct": 0.0
-    },
-    {
-      "name": "Cabin",
-      "type": "text",
-      "missing_pct": 0.8
-    },
-    {
-      "name": "Embarked",
-      "type": "categorical",
-      "missing_pct": 0.1
-    }
-  ],
-  "target_info": {
-    "name": "Survived",
-    "type": "binary",
-    "distribution": "imbalanced"
-  },
-  "known_issues": [
-    "Small test set (~400 rows) - prone to overfitting",
-    "External historical records available (can achieve 1.0 score)",
-    "Tutorial competition - not representative of real-world ML"
-  ],
-  "winning_approaches": [
-    "Feature engineering: Title extraction, family size, age/fare binning, cabin deck extraction",
-    "Handling missing values: Age imputed by Pclass/Sex, Embarked filled with mode, Cabin treated as 'Unknown'",
-    "Models: Random Forest, XGBoost, LightGBM, ensembles of 3-5 models, logistic regression as baseline"
-  ],
-  "summary": "The Titanic competition requires predicting survival based on passenger data. Key challenges include handling missing values (especially in Age and Cabin), small test set vulnerability to overfitting, and leveraging domain knowledge (e.g., historical records). Winning approaches focus on feature engineering, robust imputation, and ensemble modeling.",
   "competition_slug": "titanic",
-  "data_dir": "data/titanic"
+  "problem_type": "unknown",
+  "eval_metric": "unknown",
+  "data_shape": {
+    "rows": 10,
+    "cols": 12
+  },
+  "features": [],
+  "target_info": {},
+  "known_issues": [],
+  "winning_approaches": [],
+  "summary": "Failed to parse competition info - manual review needed",
+  "data_dir": "data/titanic",
+  "error": "Expecting value: line 1 column 1 (char 0)",
+  "raw_response": ""
 }

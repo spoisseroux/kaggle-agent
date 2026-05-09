@@ -3,68 +3,72 @@
 ## Problem Analysis
 
 - **Category:** tabular
-- **Complexity:** beginner
-- **Landscape:** tutorial
+- **Complexity:** intermediate
+- **Landscape:** active
 
 ## Recommended Approaches
 
-### 1. Robust Missing Value Handling
-**Rationale:** Proper imputation reduces noise and prevents models from learning incorrect patterns. Small test sets require stable training data to avoid overfitting.
+### 1. Advanced Missing Data Imputation
+**Rationale:** Captures relationships between features better than basic methods, reducing bias and improving model performance on missing data.
 **Effort:** medium
 **Expected Improvement:** moderate
 
-### 2. Feature Engineering for Interactions
-**Rationale:** These features capture meaningful patterns observed in similar competitions and help models generalize better on small test sets.
+### 2. Target Encoding for Rare Categorical Features
+**Rationale:** Reduces dimensionality and mitigates overfitting from high-cardinality features while retaining predictive power.
 **Effort:** medium
 **Expected Improvement:** moderate
 
-### 3. Ensemble of Simple Models
-**Rationale:** Ensembling reduces variance and improves accuracy. Cross-validation ensures models generalize well to the small test set.
-**Effort:** medium
+### 3. Ensemble Modeling with Regularization
+**Rationale:** Ensemble models inherently handle missing data and rare categories better than single models, while regularization prevents overfitting.
+**Effort:** high
 **Expected Improvement:** significant
 
-### 4. Class Weight Adjustment
-**Rationale:** Imbalanced data leads to biased models. Adjusting weights improves minority class recall, which indirectly boosts accuracy.
-**Effort:** low
-**Expected Improvement:** moderate
-
-### 5. Regularization and Simplification
-**Rationale:** Regularization combats overfitting on small test sets. Simplification ensures models remain generalizable.
+### 4. Feature Engineering for Missing Data
+**Rationale:** Provides explicit signals about missing data mechanisms, which can be predictive in real-world datasets.
 **Effort:** low
 **Expected Improvement:** baseline
 
+### 5. Cross-Validation with Stratified Sampling
+**Rationale:** Reduces variance in model performance estimates and ensures robustness to data distribution shifts.
+**Effort:** low
+**Expected Improvement:** moderate
+
 ## Model Recommendations
 
-### 1. Logistic Regression
-**Rationale:** Simple, interpretable, and effective for small datasets with proper regularization to prevent overfitting.
-**Ollama Model:** deepseek-coder:33b
+### 1. LightGBM
+**Rationale:** LightGBM is efficient with small data, handles non-linear relationships, and can prevent overfitting via early stopping and regularization.
+**Ollama Model:** qwen3:14b|deepseek-coder:33b
 
-### 2. Decision Tree
-**Rationale:** Handles small data well with explicit control over depth and pruning to avoid overfitting.
-**Ollama Model:** qwen3:14b
+### 2. Support Vector Machine (SVM)
+**Rationale:** SVMs are effective for small datasets with clear margins, and kernel tricks can capture non-linear patterns.
+**Ollama Model:** mistral:7b|deepseek-coder:33b
 
-### 3. k-Nearest Neighbors (KNN)
-**Rationale:** Non-parametric method suitable for small datasets when paired with careful hyperparameter tuning.
-**Ollama Model:** codellama:34b
+### 3. Random Forest
+**Rationale:** Provides robustness with ensemble methods, handles non-linearities, and can be tuned to avoid overfitting on small data.
+**Ollama Model:** qwen3:14b|deepseek-coder:33b
+
+### 4. XGBoost
+**Rationale:** XGBoost offers strong performance with proper regularization, making it suitable for small datasets when tuned carefully.
+**Ollama Model:** deepseek-coder:33b|qwen3:14b
+
+### 5. K-Nearest Neighbors (KNN)
+**Rationale:** Simple and effective for small datasets with clear local patterns, though sensitive to feature scaling.
+**Ollama Model:** mistral:7b|deepseek-coder:33b
 
 ## Potential Pitfalls
 
-- **Overfitting to the small test set** (critical)
-  - A small test set (~400 rows) increases the risk of models memorizing test patterns rather than generalizing, leading to inflated performance metrics that collapse in real-world scenarios.
-  - *Mitigation:* Use rigorous cross-validation (e.g., stratified k-fold) with the training data, apply regularization, and prioritize model simplicity.
+- **Data Leakage** (critical)
+  - Small dataset size increases risk of overfitting to training data, especially if validation splits are not carefully managed. Leakage can occur through improper preprocessing or feature engineering.
+  - *Mitigation:* Use strict train/validation/test splits with stratified sampling. Apply cross-validation and ensure all preprocessing steps are applied within cross-validation folds.
 
-- **Data leakage from external historical records** (critical)
-  - Using external data (e.g., historical records) risks achieving artificially high scores by exploiting information not available in the competition's dataset, violating fairness and generalizability.
-  - *Mitigation:* Strictly use only the provided data; avoid any external sources unless explicitly permitted by competition rules.
+- **Overfitting to Imbalanced Classes** (high)
+  - Imbalanced data may lead to models that favor majority classes, resulting in poor generalization. Small dataset size exacerbates this risk.
+  - *Mitigation:* Use class-weighted loss functions, synthetic oversampling (e.g., SMOTE), or evaluation metrics that account for class imbalance (e.g., F1-score, AUC-ROC).
 
-- **Metric gaming due to imbalanced classes** (high)
-  - Imbalanced data may incentivize models to prioritize majority classes, leading to poor performance on underrepresented classes despite seemingly good overall metrics (e.g., accuracy).
-  - *Mitigation:* Use appropriate evaluation metrics (e.g., F1, AUC-ROC) and apply techniques like class weighting, resampling, or cost-sensitive learning.
+- **Inadequate Handling of Missing Data** (medium)
+  - Moderate missingness may introduce bias if handled improperly (e.g., naive imputation or dropping rows). This can reduce effective sample size further.
+  - *Mitigation:* Use advanced imputation techniques (e.g., kNN, MICE) or models that inherently handle missing data (e.g., XGBoost, random forests). Perform sensitivity analyses on missingness patterns.
 
-- **Ignoring missing data patterns** (medium)
-  - Moderate missingness may contain meaningful patterns (e.g., missing not at random), but improper handling (e.g., naive imputation) can introduce bias or lose critical information.
-  - *Mitigation:* Analyze missingness mechanisms, use advanced imputation (e.g., MICE), and consider modeling missingness as a feature if justified.
-
-- **Over-reliance on tutorial simplifications** (medium)
-  - The tutorial nature may encourage simplistic approaches (e.g., default models) that fail to address real-world complexities like data drift or feature engineering.
-  - *Mitigation:* Apply rigorous validation, experiment with feature engineering, and benchmark against diverse baselines.
+- **Metric Gaming** (medium)
+  - Competitors may optimize for the evaluation metric rather than the true problem objective, especially if the metric is simplistic (e.g., accuracy on imbalanced data).
+  - *Mitigation:* Ensure the evaluation metric aligns with the problem's real-world goals. Use multiple complementary metrics for assessment.

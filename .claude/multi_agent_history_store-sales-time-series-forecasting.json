@@ -1,0 +1,14 @@
+{
+  "competition_slug": "store-sales-time-series-forecasting",
+  "phases_completed": 0,
+  "history": [],
+  "final_state": {
+    "competition_slug": "store-sales-time-series-forecasting",
+    "data_dir": "data/store-sales-time-series-forecasting",
+    "competition_info": {
+      "problem_type": "unknown",
+      "eval_metric": "unknown"
+    },
+    "research_report": {}
+  }
+}

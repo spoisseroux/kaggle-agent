@@ -6,88 +6,218 @@
     "competition_slug": "titanic",
     "data_dir": "data/titanic",
     "competition_info": {
-      "problem_type": "classification",
-      "eval_metric": "accuracy",
+      "competition_slug": "titanic",
+      "problem_type": "unknown",
+      "eval_metric": "unknown",
       "data_shape": {
-        "train_rows": 10,
-        "train_cols": 12,
-        "test_rows": 5
+        "rows": 10,
+        "cols": 12
       },
-      "features": [
+      "features": [],
+      "target_info": {},
+      "known_issues": [],
+      "winning_approaches": [],
+      "summary": "Failed to parse competition info - manual review needed",
+      "data_dir": "data/titanic",
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "raw_response": ""
+    },
+    "research_report": {
+      "problem_analysis": {
+        "problem_category": "tabular",
+        "complexity": "intermediate",
+        "key_challenges": [
+          "Handling missing data in critical features (e.g., Age)",
+          "Avoiding overfitting on rare/categorical features (e.g., Cabin letters)"
+        ],
+        "data_characteristics": {
+          "size": "small",
+          "quality": "moderate",
+          "balance": "imbalanced",
+          "missingness": "moderate"
+        },
+        "success_factors": [
+          "Feature engineering (e.g., FamilySize, title extraction)",
+          "Ensemble modeling with cross-validation",
+          "Careful handling of categorical variables"
+        ],
+        "competitive_landscape": "active"
+      },
+      "web_insights": {
+        "winning_solutions": [
+          "Top solutions often combine ensemble methods (e.g., Random Forest, XGBoost) with meticulous feature engineering, such as extracting titles from names and creating family size features. Some winners used hyperparameter tuning and cross-validation to optimize model performance."
+        ],
+        "common_approaches": [
+          "Imputing missing values in 'Age' using median or title-based groupings",
+          "Encoding categorical variables (e.g., 'Sex', 'Embarked') via one-hot encoding",
+          "Creating new features like 'FamilySize' (SibSp + Parch) and 'IsAlone'",
+          "Using pipelines for preprocessing and model training"
+        ],
+        "known_tricks": [
+          "Some competitors leaked test set information (e.g., using test data to impute missing values in training)",
+          "Overfitting on rare categories (e.g., 'Cabin' letters) which worked on the leaderboard but generalized poorly"
+        ],
+        "leaderboard_patterns": [
+          "Top scores cluster around 0.82\u20130.85; perfect scores (1.0) are rare but occasionally achieved via data leakage or overfitting",
+          "Many high-scoring solutions use ensemble models with careful feature selection"
+        ],
+        "discussion_highlights": [
+          "Debates on the ethical implications of using certain features (e.g., 'Name' for titles)",
+          "Tips for handling missing data in 'Embarked' and 'Fare'",
+          "Recommendations to avoid overfitting by simplifying models for submission"
+        ],
+        "sources": [
+          "https://www.kaggle.com/competitions/titanic/discussion/15956",
+          "https://www.kaggle.com/competitions/titanic/notebooks",
+          "https://towardsdatascience.com/titanic-machine-learning-8b75f35393e3"
+        ],
+        "searched": true
+      },
+      "similar_competitions": [],
+      "recommended_approaches": [
         {
-          "name": "PassengerId",
-          "type": "numeric",
-          "missing_pct": 0.0
+          "name": "Advanced Missing Data Imputation",
+          "priority": 1,
+          "description": "Use predictive modeling (e.g., kNN, MICE) or domain-specific rules to impute missing values in critical features like Age, rather than simple mean/median imputation.",
+          "rationale": "Captures relationships between features better than basic methods, reducing bias and improving model performance on missing data.",
+          "estimated_effort": "medium",
+          "expected_improvement": "moderate"
         },
         {
-          "name": "Survived",
-          "type": "numeric",
-          "missing_pct": 0.0
+          "name": "Target Encoding for Rare Categorical Features",
+          "priority": 2,
+          "description": "Replace rare/categorical features (e.g., Cabin letters) with target-encoded values (mean of the target per category), smoothed with Bayesian averaging to avoid overfitting.",
+          "rationale": "Reduces dimensionality and mitigates overfitting from high-cardinality features while retaining predictive power.",
+          "estimated_effort": "medium",
+          "expected_improvement": "moderate"
         },
         {
-          "name": "Pclass",
-          "type": "numeric",
-          "missing_pct": 0.0
+          "name": "Ensemble Modeling with Regularization",
+          "priority": 3,
+          "description": "Use gradient boosting (e.g., XGBoost, LightGBM) with built-in missing value handling and regularization parameters (e.g., L2) to combat overfitting on categorical features.",
+          "rationale": "Ensemble models inherently handle missing data and rare categories better than single models, while regularization prevents overfitting.",
+          "estimated_effort": "high",
+          "expected_improvement": "significant"
         },
         {
-          "name": "Name",
-          "type": "text",
-          "missing_pct": 0.0
+          "name": "Feature Engineering for Missing Data",
+          "priority": 4,
+          "description": "Create binary flags for missing values (e.g., 'Age_Missing') and interact them with other features (e.g., Age * Pclass) to capture patterns in missingness.",
+          "rationale": "Provides explicit signals about missing data mechanisms, which can be predictive in real-world datasets.",
+          "estimated_effort": "low",
+          "expected_improvement": "baseline"
         },
         {
-          "name": "Sex",
-          "type": "categorical",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "Age",
-          "type": "numeric",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "SibSp",
-          "type": "numeric",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "Parch",
-          "type": "numeric",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "Ticket",
-          "type": "text",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "Fare",
-          "type": "numeric",
-          "missing_pct": 0.0
-        },
-        {
-          "name": "Cabin",
-          "type": "text",
-          "missing_pct": 0.5
-        },
-        {
-          "name": "Embarked",
-          "type": "categorical",
-          "missing_pct": 0.0
+          "name": "Cross-Validation with Stratified Sampling",
+          "priority": 5,
+          "description": "Implement stratified k-fold cross-validation to ensure rare categories and missing data are evenly distributed across folds during training/evaluation.",
+          "rationale": "Reduces variance in model performance estimates and ensures robustness to data distribution shifts.",
+          "estimated_effort": "low",
+          "expected_improvement": "moderate"
         }
       ],
-      "target_info": {
-        "name": "Survived",
-        "type": "binary",
-        "distribution": "imbalanced"
-      },
-      "known_issues": [
-        "Test set is small and can be gamed",
-        "Many participants achieve perfect scores using external historical records"
+      "model_recommendations": [
+        {
+          "name": "LightGBM",
+          "priority": 1,
+          "rationale": "LightGBM is efficient with small data, handles non-linear relationships, and can prevent overfitting via early stopping and regularization.",
+          "suggested_config": {
+            "n_estimators": 1000,
+            "learning_rate": 0.05,
+            "max_depth": 5,
+            "min_child_samples": 5,
+            "early_stopping_rounds": 20
+          },
+          "ollama_model_recommendation": "qwen3:14b|deepseek-coder:33b",
+          "training_time_estimate": "2-5"
+        },
+        {
+          "name": "Support Vector Machine (SVM)",
+          "priority": 2,
+          "rationale": "SVMs are effective for small datasets with clear margins, and kernel tricks can capture non-linear patterns.",
+          "suggested_config": {
+            "kernel": "rbf",
+            "C": 1.0,
+            "gamma": "scale",
+            "max_iter": 1000
+          },
+          "ollama_model_recommendation": "mistral:7b|deepseek-coder:33b",
+          "training_time_estimate": "1-3"
+        },
+        {
+          "name": "Random Forest",
+          "priority": 3,
+          "rationale": "Provides robustness with ensemble methods, handles non-linearities, and can be tuned to avoid overfitting on small data.",
+          "suggested_config": {
+            "n_estimators": 100,
+            "max_depth": 5,
+            "min_samples_split": 5,
+            "min_samples_leaf": 2
+          },
+          "ollama_model_recommendation": "qwen3:14b|deepseek-coder:33b",
+          "training_time_estimate": "1-2"
+        },
+        {
+          "name": "XGBoost",
+          "priority": 4,
+          "rationale": "XGBoost offers strong performance with proper regularization, making it suitable for small datasets when tuned carefully.",
+          "suggested_config": {
+            "n_estimators": 500,
+            "learning_rate": 0.1,
+            "max_depth": 4,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8
+          },
+          "ollama_model_recommendation": "deepseek-coder:33b|qwen3:14b",
+          "training_time_estimate": "3-5"
+        },
+        {
+          "name": "K-Nearest Neighbors (KNN)",
+          "priority": 5,
+          "rationale": "Simple and effective for small datasets with clear local patterns, though sensitive to feature scaling.",
+          "suggested_config": {
+            "n_neighbors": 3,
+            "weights": "distance",
+            "algorithm": "brute"
+          },
+          "ollama_model_recommendation": "mistral:7b|deepseek-coder:33b",
+          "training_time_estimate": "1"
+        }
       ],
-      "winning_approaches": [],
-      "summary": "The competition involves predicting passenger survival on the Titanic based on features like age, gender, class, and family relationships. Key challenges include handling missing data (e.g., Age, Cabin), engineering meaningful features from text (e.g., names, tickets), and addressing class imbalances. The test set's small size and potential for overfitting add complexity.",
-      "competition_slug": "titanic",
-      "data_dir": "data/titanic"
+      "feature_strategies": [],
+      "pitfalls": [
+        {
+          "issue": "Data Leakage",
+          "severity": "critical",
+          "description": "Small dataset size increases risk of overfitting to training data, especially if validation splits are not carefully managed. Leakage can occur through improper preprocessing or feature engineering.",
+          "mitigation": "Use strict train/validation/test splits with stratified sampling. Apply cross-validation and ensure all preprocessing steps are applied within cross-validation folds."
+        },
+        {
+          "issue": "Overfitting to Imbalanced Classes",
+          "severity": "high",
+          "description": "Imbalanced data may lead to models that favor majority classes, resulting in poor generalization. Small dataset size exacerbates this risk.",
+          "mitigation": "Use class-weighted loss functions, synthetic oversampling (e.g., SMOTE), or evaluation metrics that account for class imbalance (e.g., F1-score, AUC-ROC)."
+        },
+        {
+          "issue": "Inadequate Handling of Missing Data",
+          "severity": "medium",
+          "description": "Moderate missingness may introduce bias if handled improperly (e.g., naive imputation or dropping rows). This can reduce effective sample size further.",
+          "mitigation": "Use advanced imputation techniques (e.g., kNN, MICE) or models that inherently handle missing data (e.g., XGBoost, random forests). Perform sensitivity analyses on missingness patterns."
+        },
+        {
+          "issue": "Metric Gaming",
+          "severity": "medium",
+          "description": "Competitors may optimize for the evaluation metric rather than the true problem objective, especially if the metric is simplistic (e.g., accuracy on imbalanced data).",
+          "mitigation": "Ensure the evaluation metric aligns with the problem's real-world goals. Use multiple complementary metrics for assessment."
+        }
+      ],
+      "resource_estimate": {
+        "per_approach_time": "1-2 hours",
+        "total_time_estimate": "15-30 hours",
+        "compute_requirements": "CPU sufficient",
+        "gpu_recommended": false,
+        "parallel_tasks": 3
+      }
     }
   }
 }
