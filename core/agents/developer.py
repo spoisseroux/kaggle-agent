@@ -113,7 +113,15 @@ def develop_task(
 
     # Max attempts exhausted
     log.error(f"Failed to implement {task['name']} after {max_attempts} attempts")
-    raise Exception(f"Task implementation failed after {max_attempts} debugging attempts")
+    return {
+        "code": code,
+        "output": "",
+        "eval": {"pass": False, "issues": ["Max debugging attempts exhausted"]},
+        "attempts": max_attempts,
+        "llm_used": llm_used,
+        "success": False,
+        "error": "Max debugging attempts exhausted - code still has errors",
+    }
 
 
 def _generate_code(
@@ -158,9 +166,11 @@ Generate complete, executable Python code that:
 5. Prints summary results
 
 Guidelines:
-- Import all needed libraries at the top
+- Import all needed libraries at the top (pandas, numpy, matplotlib.pyplot, seaborn if needed)
 - Use CORRECT import paths: from core.tools.cleaning import handle_missing_values
 - Use absolute paths based on data_dir: f"{{data_dir}}/train.csv"
+- ALWAYS check if files exist before reading: Path(file_path).exists()
+- Use try/except for file operations and print clear error messages
 - Include helpful comments
 - Return or print key metrics/results
 - Don't use placeholder data - work with real files
@@ -169,6 +179,24 @@ CRITICAL: Import tools from core.tools.* modules:
   from core.tools.cleaning import handle_missing_values, detect_outliers
   from core.tools.features import create_lag_features, one_hot_encode
   from core.tools.modeling import select_model, train_with_cv
+
+REQUIRED IMPORTS (always include these):
+```python
+import pandas as pd
+import numpy as np
+from pathlib import Path
+# Add matplotlib/seaborn only if visualization is needed
+# Add sklearn only if modeling is needed
+```
+
+FILE PATH PATTERN (always use this):
+```python
+data_dir = Path("{data_dir}")
+train_path = data_dir / "train.csv"
+if not train_path.exists():
+    raise FileNotFoundError(f"Training data not found at {{train_path}}")
+df = pd.read_csv(train_path)
+```
 
 Return ONLY Python code in a code block. No explanations before/after.
 """
@@ -287,6 +315,9 @@ def _debug_with_ollama(
     state: Dict[str, Any],
 ) -> str:
     """Debug code with Ollama."""
+    # Get data directory info
+    data_dir = state.get("data_dir", "data/")
+
     prompt = f"""
 This code has an error. Fix it.
 
@@ -301,15 +332,33 @@ This code has an error. Fix it.
 === ERROR ===
 {error}
 
+=== DATA DIRECTORY ===
+{data_dir}
+
+Expected files:
+- {data_dir}/train.csv (training data)
+- {data_dir}/test.csv (test data)
+
 ---
 
 Analyze the error and generate fixed code.
 
-Common issues:
-- Import errors: add missing imports
-- File not found: check path construction
-- Shape mismatch: verify data dimensions
-- Syntax errors: fix typos, indentation
+Common issues and fixes:
+- ImportError (seaborn, sklearn): Add `import seaborn as sns` or `from sklearn.X import Y`
+- FileNotFoundError: Use `Path("{data_dir}") / "train.csv"` pattern
+- NameError: Variable not defined - check spelling or add import
+- SyntaxError: Fix indentation, missing colons, unmatched parentheses
+- KeyError: Column doesn't exist - check DataFrame column names first
+- TypeError: Wrong data type - check df.dtypes
+
+CRITICAL: Always validate file paths:
+```python
+from pathlib import Path
+data_dir = Path("{data_dir}")
+train_path = data_dir / "train.csv"
+if not train_path.exists():
+    raise FileNotFoundError(f"Training data not found at {{train_path}}")
+```
 
 Return ONLY the complete fixed Python code in a code block. No explanations.
 """
@@ -381,16 +430,33 @@ def _extract_code(response: str) -> str:
         parts = response.split("```python")
         if len(parts) > 1:
             code = parts[1].split("```")[0]
-            return code.strip()
+            return _validate_and_fix_code(code.strip())
 
     if "```" in response:
         parts = response.split("```")
         if len(parts) >= 3:
             code = parts[1]
-            return code.strip()
+            # Skip if it's not Python (e.g., ```json)
+            if not any(lang in parts[0][-20:].lower() for lang in ["json", "yaml", "bash", "sh"]):
+                return _validate_and_fix_code(code.strip())
 
     # No code block markers - return as-is
-    return response
+    return _validate_and_fix_code(response)
+
+
+def _validate_and_fix_code(code: str) -> str:
+    """Validate code syntax and apply common fixes."""
+    # Remove common Markdown artifacts
+    code = code.replace("```python", "").replace("```", "")
+
+    # Check for basic syntax errors using compile
+    try:
+        compile(code, "<string>", "exec")
+        return code
+    except SyntaxError as e:
+        log.warning(f"Syntax error in generated code: {e}")
+        # Return as-is, let the execution loop catch it
+        return code
 
 
 def _format_tools(tools_library: Dict[str, Any]) -> str:

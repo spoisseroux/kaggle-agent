@@ -25,6 +25,63 @@ USE_CLAUDE_FOR_RESEARCH = True
 log = logging.getLogger(__name__)
 
 
+def _web_search_competition_insights(competition_slug: str, problem_type: str) -> Dict[str, Any]:
+    """
+    Search the web for competition insights via Claude.
+
+    This asks Claude to perform web searches and synthesize findings.
+    """
+    log.info(f"Web search requested for {competition_slug}")
+
+    prompt = f"""
+Search the web for insights about this Kaggle competition: {competition_slug}
+
+Competition type: {problem_type}
+
+Please search for:
+1. "kaggle {competition_slug} winning solution" or "kaggle {competition_slug} top solutions"
+2. "kaggle {competition_slug} discussion" or "kaggle {competition_slug} tricks"
+3. "kaggle {competition_slug} leaderboard" or "kaggle {competition_slug} perfect score"
+4. "{problem_type} kaggle competition approaches 2025 2026"
+
+Synthesize findings into a JSON object:
+{{
+  "winning_solutions": ["summary of top approaches from winners"],
+  "common_approaches": ["frequently mentioned techniques"],
+  "known_tricks": ["any known data leaks, shortcuts, or tricks"],
+  "leaderboard_patterns": ["score distribution, perfect scores, etc."],
+  "discussion_highlights": ["key insights from discussions"],
+  "sources": ["list of URLs you found useful"]
+}}
+
+Return ONLY the JSON object.
+"""
+
+    system = "You are a Kaggle competition researcher. Use web search to find real competition insights."
+
+    if USE_CLAUDE_FOR_RESEARCH:
+        try:
+            response = ask_claude(prompt, system=system, reason="Web research for competition")
+
+            # Parse JSON
+            response_clean = response.strip()
+            if response_clean.startswith("```json"):
+                response_clean = response_clean.split("```json")[1].split("```")[0].strip()
+            elif response_clean.startswith("```"):
+                response_clean = response_clean.split("```")[1].split("```")[0].strip()
+
+            insights = json.loads(response_clean)
+            insights["searched"] = True
+            return insights
+
+        except Exception as e:
+            log.warning(f"Web search failed: {e}")
+            return {"searched": False, "error": str(e)}
+    else:
+        log.info("Skipping web search (Claude not enabled)")
+        return {"searched": False, "reason": "Claude disabled"}
+
+
 def research_competition(
     comp_info: Dict[str, Any],
     depth: str = "standard",
@@ -48,8 +105,16 @@ def research_competition(
     """
     log.info(f"Research agent analyzing {comp_info.get('competition_slug', 'unknown')}")
 
+    # 0. Web search for competition insights (if depth allows)
+    web_insights = {}
+    if depth in ["standard", "deep"]:
+        web_insights = _web_search_competition_insights(
+            comp_info.get('competition_slug', ''),
+            comp_info.get('problem_type', ''),
+        )
+
     # 1. Analyze problem characteristics
-    problem_analysis = _analyze_problem(comp_info)
+    problem_analysis = _analyze_problem(comp_info, web_insights)
 
     # 2. Search for similar competitions
     similar_comps = _find_similar_competitions(comp_info)
@@ -71,6 +136,7 @@ def research_competition(
 
     research_report = {
         "problem_analysis": problem_analysis,
+        "web_insights": web_insights,
         "similar_competitions": similar_comps,
         "recommended_approaches": approaches,
         "model_recommendations": models,
@@ -87,8 +153,22 @@ def research_competition(
     return research_report
 
 
-def _analyze_problem(comp_info: Dict[str, Any]) -> Dict[str, Any]:
+def _analyze_problem(comp_info: Dict[str, Any], web_insights: Dict[str, Any] = None) -> Dict[str, Any]:
     """Deep analysis of problem characteristics."""
+    web_insights = web_insights or {}
+
+    # Format web insights if available
+    web_context = ""
+    if web_insights.get("searched"):
+        web_context = f"""
+
+=== WEB RESEARCH INSIGHTS ===
+Winning Solutions: {web_insights.get('winning_solutions', [])}
+Common Approaches: {web_insights.get('common_approaches', [])}
+Known Tricks: {web_insights.get('known_tricks', [])}
+Leaderboard Patterns: {web_insights.get('leaderboard_patterns', [])}
+"""
+
     prompt = f"""
 Analyze this Kaggle competition problem in detail:
 
@@ -99,6 +179,7 @@ Target: {comp_info.get('target_info', {})}
 Known Issues: {comp_info.get('known_issues', [])}
 
 Summary: {comp_info.get('summary', '')}
+{web_context}
 
 Provide deep analysis in JSON format:
 {{

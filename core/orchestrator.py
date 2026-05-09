@@ -206,11 +206,16 @@ class MultiAgentOrchestrator:
                 # Develop
                 dev_result = develop_task(task, self.tools_library, self.state)
 
-                # Review
+                # Review (pass full result as exec_result, not just output)
+                exec_result = {
+                    "success": dev_result.get("success", False),
+                    "output": dev_result.get("output", ""),
+                    "error": dev_result.get("error", ""),
+                }
                 review = review_code(
                     dev_result["code"],
                     task,
-                    dev_result.get("output", {}),
+                    exec_result,
                     dev_result.get("eval", {}),
                 )
 
@@ -226,10 +231,15 @@ class MultiAgentOrchestrator:
 
                         # One retry with feedback
                         dev_result = self._retry_task_with_feedback(task, review, dev_result)
+                        exec_result = {
+                            "success": dev_result.get("success", False),
+                            "output": dev_result.get("output", ""),
+                            "error": dev_result.get("error", ""),
+                        }
                         review = review_code(
                             dev_result["code"],
                             task,
-                            dev_result.get("output", {}),
+                            exec_result,
                             dev_result.get("eval", {}),
                         )
 

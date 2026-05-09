@@ -19,12 +19,19 @@ from __future__ import annotations
 import os
 import json
 import subprocess
+import time
 from enum import Enum
 from typing import Optional, Dict, Any
 import logging
 
 from core.ollama_client import generate as ollama_generate
 from core.ask_human import ask
+
+try:
+    from core.langfuse_integration import trace_llm_call
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
 
 try:
     from core.model_config import get_agent_model
@@ -88,9 +95,9 @@ def get_llm_response(
         model = None
         if MODEL_CONFIG_AVAILABLE and agent:
             model = get_agent_model(agent, task_type, competition)
-        return _call_ollama(prompt, system, think, temperature, max_tokens, timeout, model)
+        return _call_ollama(prompt, system, think, temperature, max_tokens, timeout, model, agent)
     elif mode == LLMMode.CLAUDE:
-        return _call_claude(prompt, system, temperature, max_tokens, reason)
+        return _call_claude(prompt, system, temperature, max_tokens, reason, agent)
     else:
         raise ValueError(f"Unknown LLM mode: {mode}")
 
@@ -103,18 +110,38 @@ def _call_ollama(
     max_tokens: int,
     timeout: float,
     model: Optional[str] = None,
+    agent: Optional[str] = None,
 ) -> str:
     """Call local Ollama with dynamic model selection."""
+    model_name = model or "qwen3:14b"
+    start_time = time.time()
+
     try:
-        return ollama_generate(
+        response = ollama_generate(
             prompt,
-            model=model or "qwen3:14b",  # Use specified model or default
+            model=model_name,
             system=system,
             think=think,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout_s=timeout,
         )
+
+        # Trace to Langfuse
+        if LANGFUSE_AVAILABLE:
+            duration = time.time() - start_time
+            trace_llm_call(
+                func_name="ollama",
+                model=model_name,
+                prompt=prompt,
+                response=response,
+                duration=duration,
+                agent=agent,
+                metadata={"think": think, "temperature": temperature},
+            )
+
+        return response
+
     except Exception as e:
         log.error(f"Ollama call failed: {e}")
         raise
@@ -126,6 +153,7 @@ def _call_claude(
     temperature: float,
     max_tokens: int,
     reason: Optional[str],
+    agent: Optional[str] = None,
 ) -> str:
     """
     Call Claude (backend configured via CLAUDE_BACKEND env var).
@@ -135,13 +163,34 @@ def _call_claude(
     - claude_api: Direct API call via Anthropic SDK (future)
     """
     backend = LLMBackend(CLAUDE_BACKEND)
+    start_time = time.time()
 
-    if backend == LLMBackend.CLAUDE_CODE:
-        return _escalate_to_claude_code(prompt, system, reason)
-    elif backend == LLMBackend.CLAUDE_API:
-        return _call_claude_api(prompt, system, temperature, max_tokens)
-    else:
-        raise ValueError(f"Unknown Claude backend: {backend}")
+    try:
+        if backend == LLMBackend.CLAUDE_CODE:
+            response = _escalate_to_claude_code(prompt, system, reason)
+        elif backend == LLMBackend.CLAUDE_API:
+            response = _call_claude_api(prompt, system, temperature, max_tokens)
+        else:
+            raise ValueError(f"Unknown Claude backend: {backend}")
+
+        # Trace to Langfuse
+        if LANGFUSE_AVAILABLE:
+            duration = time.time() - start_time
+            trace_llm_call(
+                func_name="claude",
+                model=CLAUDE_MODEL,
+                prompt=prompt,
+                response=response,
+                duration=duration,
+                agent=agent,
+                metadata={"reason": reason, "backend": backend.value},
+            )
+
+        return response
+
+    except Exception as e:
+        log.error(f"Claude call failed: {e}")
+        raise
 
 
 def _escalate_to_claude_code(

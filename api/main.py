@@ -145,6 +145,11 @@ def health() -> dict:
         "ollama": bool(oll.get("ok")),
         "telegram": _service_active("telegram-bot"),
         "mlflow": _service_active("mlflow"),
+        "langfuse": {
+            "url": "http://docker:3000/project/cmoxvzksu0006rttfvmavgrc9",
+            "type": "external_link",
+            "status": _service_active("langfuse"),
+        },
     }
     try:
         gpu = gpu_monitor.snapshot()
