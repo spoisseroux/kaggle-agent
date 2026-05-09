@@ -96,6 +96,17 @@ def _service_active(name: str) -> bool:
         return False
 
 
+def _langfuse_online() -> bool:
+    """Check if Langfuse is responding (runs in Docker, not systemd)."""
+    try:
+        import requests
+        r = requests.get("http://docker:3000/", timeout=2)
+        # Langfuse returns 200 for root page
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 def _trend_slope(values: list[float]) -> float | None:
     if len(values) < 2:
         return None
@@ -148,7 +159,7 @@ def health() -> dict:
         "langfuse": {
             "url": "http://docker:3000/project/cmoxvzksu0006rttfvmavgrc9",
             "type": "external_link",
-            "status": _service_active("langfuse"),
+            "status": _langfuse_online(),
         },
     }
     try:
