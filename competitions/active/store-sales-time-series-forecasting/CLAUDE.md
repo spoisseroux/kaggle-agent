@@ -69,24 +69,48 @@ Best 12 features (95% of predictive power):
 
 ## Current Best Models (Holdout Validation)
 
-After retraining top 3 models with 30-day holdout validation:
+### v14 - Advanced Features (CURRENT BEST)
+- **Holdout CV**: 0.4640 ⭐
+- **Expected LB**: ~0.50
+- **Features**: 27 total
+  - EWMA (exponential weighted MA)
+  - WoW_diff (week-over-week change)  
+  - Interaction features (promo×holiday, weekend×promo)
+  - Enhanced temporal (week, month, year, month_start/end)
+  - Store/family clustering
+- **Top features**: Roll_mean_7, onpromotion, Lag_7, EWMA_7, WoW_diff
+- **Improvement**: 4.2% vs v1 baseline
+- **File**: `xgb_v14_advanced_04640.csv`
 
-1. **v1_baseline_holdout** - RECOMMENDED
-   - Holdout CV: 0.4842
-   - Expected LB: 0.48-0.53
-   - Simple, robust baseline model
-   - File: `xgb_v1_baseline_holdout_04842.csv`
+### v1_baseline_holdout (Validated)
+- **Holdout CV**: 0.4842
+- **Actual LB**: 0.5291
+- **Gap**: 0.045 (9.3%) ✅
+- **Validation proof**: 30-day holdout works!
+- **File**: `xgb_v1_baseline_holdout_04842.csv`
 
-2. **v2_fixed_lags_holdout**
-   - Holdout CV: 0.5177
-   - Includes lag features
-   
-3. **optuna_holdout**
-   - Holdout CV: 0.5615 (worst CV)
-   - Original LB: 0.464 (best LB) 
-   - Gap suggests overfitting to test period
+### Previous Models
+- v2_fixed_lags_holdout: 0.5177 holdout CV
+- optuna_holdout: 0.5615 holdout CV
+
+## Autonomous Progress (May 9, 2026 - Evening)
+
+### Phase 1: Validation Strategy Validation ✅
+- Submitted v1_baseline to Kaggle
+- Confirmed: Holdout CV 0.48 → LB 0.53 (9.3% gap)
+- Much better than TimeSeriesSplit (163% gap!)
+
+### Phase 2: Feature Engineering ✅
+- Researched Kaggle best practices
+- Built v14 with advanced features
+- Achieved 4.2% improvement
+
+### Phase 3: Hyperparameter Optimization (In Progress)
+- v15 using Optuna on v14 features
+- 30 trials, targeting <0.464 CV
 
 ## Next Steps
-1. Submit v1_baseline_holdout to validate holdout CV predicts LB
-2. If validated, use 30-day holdout for all future model selection
-3. Continue feature engineering with proper validation
+1. Complete v15 Optuna tuning
+2. Try ensemble (XGBoost + LightGBM stacking)
+3. Submit v14 to validate expected LB ~0.50
+4. Feature selection to remove noise
