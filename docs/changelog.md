@@ -1,5 +1,55 @@
 # Changelog
 
+## 2026-05-09 — Store Sales Optimization + Learning Multi-Agent Design
+
+### Work Completed
+- **Store Sales Competition Progress** ✅
+  - XGBoost v10: Combined v1 features + v5 hyperparameters, CV 0.370, LB 0.48159
+  - Optuna hyperparameter optimization: 50 trials, CV 0.345 (6.7% improvement), LB 0.46403
+  - Rank 330/932 (Top 64.7%) on leaderboard
+  - Feature importance analysis: Identified top 12 features contributing 95% importance
+  - Tested CatBoost, LightGBM, ensemble approaches (XGBoost remains best)
+  - Fixed submission tracking: Added insert_submission() calls to record experiments in Postgres
+
+- **Langfuse Single-Agent Tracking** ✅
+  - Created `core/langfuse_tracker.py` with decorators for observability
+  - `@track_experiment`: Log training runs with CV/LB scores
+  - `@track_decision`: Capture decision-making moments
+  - `@track_phase`: Mark workflow phases
+  - `manual_trace()`: Ad-hoc event tracking
+  - Enables Langfuse dashboard visualization of single-agent work
+
+- **Learning Multi-Agent System Design** ✅
+  - Created comprehensive design: `docs/learning_multiagent_design.md`
+  - Redesigned multi-agent from rigid phase workflow to dynamic learning loop
+  - 5 specialized agents:
+    1. **Analyst**: Analyzes past experiments, identifies bottlenecks
+    2. **Strategist**: Decides what to try next based on data (not fixed phases)
+    3. **Engineer**: Implements with memory of past failures
+    4. **Evaluator**: Assesses success, performs root cause analysis
+    5. **Curator**: Stores learnings for future runs
+  - Workflow: Analyze → Strategize → Implement → Evaluate → Learn → REPEAT
+  - Memory-first approach: Every agent queries past work before acting
+  - No LangChain dependency - uses existing primitives (Postgres, Qdrant, Ollama, Langfuse)
+
+- **Frontend Usage Tracker** ✅
+  - Usage tracker widget already implemented (from previous session)
+  - API proxy endpoint `/api/usage` exists
+  - Backend `/usage/stats` endpoint functional
+  - Shows GPU vs Claude percentage, API usage metrics, mode history
+
+### Root Cause Analysis
+- **Why dashboards were empty**: Hybrid orchestrator infrastructure was built but never actually used in execution flow
+- **DeepEval empty**: Only runs during multi-agent Developer agent validation, but we used single-agent mode
+- **Langfuse empty**: @observe decorators added to hybrid_orchestrator.py but never called
+- **Frontend missing submissions**: Experiments were submitted to Kaggle but never recorded to Postgres via insert_submission()
+
+### Next Steps
+- Implement learning multi-agent system (5 agents + orchestration loop)
+- Test autonomous iteration on store-sales competition
+- Measure if it finds approaches not tried manually
+- Build institutional knowledge base for future competitions
+
 ## 2026-05-08 — AutoKaggle Integration Design + /replay Skill
 
 ### Work Completed
