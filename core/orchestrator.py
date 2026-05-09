@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from core.agents.reader import read_competition, save_competition_info
+from core.agents.researcher import research_competition
 from core.agents.planner import plan_phase
 from core.agents.developer import develop_task
 from core.agents.reviewer import review_code
@@ -82,10 +83,14 @@ class MultiAgentOrchestrator:
         # Phase 0: Reader
         if start_phase == 0 and not skip_reader:
             self._run_reader()
+            # Run Research agent after Reader
+            self._run_researcher()
 
         # Load competition info if not run yet
         if "competition_info" not in self.state:
             self._load_competition_info()
+            # Try to load research report too
+            self._load_research_report()
 
         # Phases 1-6
         for phase_idx in range(max(start_phase, 1), end_phase):
@@ -124,6 +129,42 @@ class MultiAgentOrchestrator:
             f"- Data: {comp_info['data_shape']}"
         )
         notify(f"✓ {summary_msg}")
+
+    def _run_researcher(self) -> None:
+        """Run Research agent."""
+        log.info("=== RESEARCH AGENT ===")
+        notify(f"🔬 Research agent analyzing approach for {self.slug}")
+
+        comp_info = self.state.get("competition_info", {})
+        research_report = research_competition(comp_info, depth="standard")
+
+        self.state["research_report"] = research_report
+
+        # Summarize key findings
+        approaches = research_report.get("recommended_approaches", [])
+        models = research_report.get("model_recommendations", [])
+        pitfalls = research_report.get("pitfalls", [])
+
+        summary_msg = (
+            f"Research complete:\n"
+            f"- {len(approaches)} approaches recommended\n"
+            f"- {len(models)} models suggested\n"
+            f"- {len(pitfalls)} pitfalls identified\n"
+            f"Top approach: {approaches[0]['name'] if approaches else 'N/A'}"
+        )
+        notify(f"✓ {summary_msg}")
+
+    def _load_research_report(self) -> None:
+        """Load existing research report."""
+        research_path = Path(f".claude/research/{self.slug}_research.json")
+
+        if research_path.exists():
+            with research_path.open() as f:
+                self.state["research_report"] = json.load(f)
+            log.info("Loaded existing research report")
+        else:
+            log.warning("No research report found - run Research agent first")
+            self.state["research_report"] = {}
 
     def _load_competition_info(self) -> None:
         """Load existing competition info."""
