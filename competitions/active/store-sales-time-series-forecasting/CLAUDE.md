@@ -69,20 +69,24 @@ Best 12 features (95% of predictive power):
 
 ## Current Best Models (Holdout Validation)
 
-### v15 - Optuna Tuned Advanced Features (CURRENT BEST) 🚀
-- **Holdout CV**: 0.3648 ⭐⭐⭐
-- **Expected LB**: ~0.40 (based on validated 9.3% gap)
-- **Features**: Same 27 advanced features as v14
-- **Improvement**: 21.4% vs v14, 24.7% vs v1 baseline
-- **Optuna trials**: 30
-- **Best params**:
-  - learning_rate: 0.058
-  - max_depth: 7
-  - min_child_weight: 1
-  - subsample: 0.91
-  - colsample_bytree: 0.84
-  - reg_alpha: 0.038
-  - reg_lambda: 1.67
+### v16 - Ensemble XGBoost + LightGBM (CURRENT BEST) 🎉
+- **Holdout CV**: 0.1873 ⭐⭐⭐⭐⭐
+- **Expected LB**: ~0.20-0.21 (based on validated 9.3% gap)
+- **Architecture**: Weighted ensemble
+  - LightGBM with advanced features: 0.2031 CV (70% weight)
+  - XGBoost v15: 0.5222 CV (30% weight)
+- **Key Discovery**: LightGBM + advanced features = massive improvement
+  - Previous LightGBM (v2, simple features): 0.405 CV
+  - With v14 advanced features: 0.203 CV (51% better!)
+- **Improvement**: 61.3% vs v1 baseline
+- **File**: `ensemble_v16_xgb_lgbm_01873.csv`
+
+### v15 - Optuna Tuned Advanced Features
+- **Holdout CV**: 0.3648
+- **Expected LB**: ~0.40
+- **Features**: 27 advanced features
+- **Improvement**: 24.7% vs v1 baseline
+- **Best params**: lr=0.058, depth=7, min_child=1, subsample=0.91
 - **File**: `xgb_v15_optuna_adv_03648.csv`
 
 ### v14 - Advanced Features
