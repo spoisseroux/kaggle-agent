@@ -270,7 +270,7 @@ def _validate_with_deepeval(
     state: Dict[str, Any],
     exec_result: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Validate code with DeepEval."""
+    """Validate code with DeepEval and submit results to API."""
     if not DEEPEVAL_AVAILABLE:
         # DeepEval not available - simple validation
         return {
@@ -280,22 +280,60 @@ def _validate_with_deepeval(
         }
 
     try:
+        from core.experiment_evaluator import ExperimentEvaluator
+        import requests
+
         evaluator = ExperimentEvaluator()
 
-        # Build context for evaluation
-        eval_context = {
-            "task_name": task["name"],
-            "expected_output": task["expected_output"],
-            "code": code,
-            "execution_output": exec_result["output"],
+        # Extract experiment details from task
+        experiment_config = {
+            "validation_strategy": state.get("validation_strategy", "train_test_split"),
+            "features": state.get("features", []),
+            "hyperparameters": state.get("hyperparameters", {}),
+            "model_type": state.get("model_type", "unknown"),
         }
 
-        # For now, simple validation based on successful execution
-        # TODO: integrate full ExperimentEvaluator
+        # Get CV scores (use defaults if not available)
+        cv_score = state.get("cv_score", 0.5)
+        baseline_score = state.get("baseline_score", 0.5)
+
+        # Run LLM-based evaluation
+        eval_result = evaluator.evaluate_experiment(
+            experiment_config,
+            cv_score=cv_score,
+            baseline_score=baseline_score,
+            competition_type=state.get("competition_type", "time-series")
+        )
+
+        # Submit to API
+        try:
+            api_url = "http://localhost:8765/deepeval/submit"
+            response = requests.post(api_url, json={
+                "experiment_name": task.get("name", "Unknown Task"),
+                "passed": eval_result.get("passed", True),
+                "score": eval_result.get("score", 0.5),
+                "issues": eval_result.get("issues", []),
+                "warnings": eval_result.get("warnings", []),
+                "recommendation": eval_result.get("recommendation", "No recommendation"),
+                "cv_score": cv_score,
+                "baseline_score": baseline_score,
+                "competition": state.get("competition", None),
+            }, timeout=5)
+
+            if response.status_code == 200:
+                log.info(f"DeepEval result submitted to API: {response.json()}")
+            else:
+                log.warning(f"Failed to submit DeepEval result: {response.status_code}")
+        except Exception as e:
+            log.warning(f"Failed to submit DeepEval result to API: {e}")
+
+        # Return result for local use
         return {
-            "pass": True,
-            "issues": [],
-            "warnings": [],
+            "pass": eval_result.get("passed", True),
+            "issues": eval_result.get("issues", []),
+            "warnings": eval_result.get("warnings", []),
+            "score": eval_result.get("score", 0.5),
+            "recommendation": eval_result.get("recommendation", ""),
         }
 
     except Exception as e:
