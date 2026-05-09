@@ -69,15 +69,26 @@ Best 12 features (95% of predictive power):
 
 ## Current Best Models (Holdout Validation)
 
-### v14 - Advanced Features (CURRENT BEST)
-- **Holdout CV**: 0.4640 ⭐
+### v15 - Optuna Tuned Advanced Features (CURRENT BEST) 🚀
+- **Holdout CV**: 0.3648 ⭐⭐⭐
+- **Expected LB**: ~0.40 (based on validated 9.3% gap)
+- **Features**: Same 27 advanced features as v14
+- **Improvement**: 21.4% vs v14, 24.7% vs v1 baseline
+- **Optuna trials**: 30
+- **Best params**:
+  - learning_rate: 0.058
+  - max_depth: 7
+  - min_child_weight: 1
+  - subsample: 0.91
+  - colsample_bytree: 0.84
+  - reg_alpha: 0.038
+  - reg_lambda: 1.67
+- **File**: `xgb_v15_optuna_adv_03648.csv`
+
+### v14 - Advanced Features
+- **Holdout CV**: 0.4640
 - **Expected LB**: ~0.50
-- **Features**: 27 total
-  - EWMA (exponential weighted MA)
-  - WoW_diff (week-over-week change)  
-  - Interaction features (promo×holiday, weekend×promo)
-  - Enhanced temporal (week, month, year, month_start/end)
-  - Store/family clustering
+- **Features**: 27 total (EWMA, WoW_diff, interactions, temporal, clustering)
 - **Top features**: Roll_mean_7, onpromotion, Lag_7, EWMA_7, WoW_diff
 - **Improvement**: 4.2% vs v1 baseline
 - **File**: `xgb_v14_advanced_04640.csv`
