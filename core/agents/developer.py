@@ -152,17 +152,23 @@ Expected output: {task['expected_output']}
 
 Generate complete, executable Python code that:
 1. Follows the methodology steps
-2. Uses the available tools where applicable
+2. Uses the available tools where applicable (import from core.tools.*)
 3. Handles errors gracefully
 4. Saves outputs to files (if applicable)
 5. Prints summary results
 
 Guidelines:
 - Import all needed libraries at the top
-- Use absolute paths based on data_dir
+- Use CORRECT import paths: from core.tools.cleaning import handle_missing_values
+- Use absolute paths based on data_dir: f"{{data_dir}}/train.csv"
 - Include helpful comments
 - Return or print key metrics/results
 - Don't use placeholder data - work with real files
+
+CRITICAL: Import tools from core.tools.* modules:
+  from core.tools.cleaning import handle_missing_values, detect_outliers
+  from core.tools.features import create_lag_features, one_hot_encode
+  from core.tools.modeling import select_model, train_with_cv
 
 Return ONLY Python code in a code block. No explanations before/after.
 """
@@ -380,13 +386,30 @@ def _extract_code(response: str) -> str:
 
 
 def _format_tools(tools_library: Dict[str, Any]) -> str:
-    """Format tools library for prompt."""
+    """Format tools library for prompt with correct import paths."""
     if not tools_library:
         return "No tools available yet - implement from scratch using pandas/sklearn."
 
     tools_text = []
+
+    # Map category to import module
+    import_map = {
+        "data_cleaning": "core.tools.cleaning",
+        "feature_engineering": "core.tools.features",
+        "modeling": "core.tools.modeling",
+    }
+
     for category, tools in tools_library.items():
-        tools_text.append(f"\n{category}:")
+        module = import_map.get(category, f"core.tools.{category}")
+        tools_text.append(f"\n{category} (from {module}):")
+
+        # List functions
+        func_names = [tool['name'] for tool in tools]
+        tools_text.append(f"  Import: from {module} import {', '.join(func_names[:3])}")
+        if len(func_names) > 3:
+            tools_text.append(f"          # ... and {len(func_names) - 3} more")
+
+        # List with descriptions
         for tool in tools:
             tools_text.append(f"  - {tool['name']}: {tool['description']}")
 
