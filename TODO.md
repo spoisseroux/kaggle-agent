@@ -2,12 +2,21 @@
 
 ## High Priority
 
-- [x] **DeepEval Integration** ✅ COMPLETE
-  - FastAPI service with Docker deployment
-  - Experiment quality validation before submission
-  - Catches validation strategy errors
-  - CLI tool: scripts/eval_experiment.py
-  - Deployed: Port 8001 on Tailscale
+- [ ] **DeepEval Rebuild - Proper Build Loop** 🔄 IN PROGRESS
+  - REPLACE homelab service with built-in evaluation
+  - Use RTX 5070 + Ollama for LLM-based metrics (not 1070)
+  - Build-loop integration: eval → fix → re-eval
+  - Real DeepEval features: test cases, metrics, traces
+  - Evaluates experiments DURING development
+  - Framework: https://www.deepeval.com/docs/vibe-coding
+  - Time: 4-6 hours
+  
+- [ ] **Eval Platform GUI**
+  - Frontend dashboard for evaluation results
+  - View metrics, traces, test cases
+  - Track eval history across experiments
+  - Integration with frontend (access needed)
+  - Time: 3-4 hours
 
 - [x] **Better Telegram Formatting** ✅ COMPLETE
   - Created core/format_telegram.py
@@ -63,6 +72,7 @@
 
 ## Completed
 
+- [x] DeepEval v1 (basic validation service on homelab) - being replaced
 - [x] TimeSeriesSplit validation fix
 - [x] Feature selection optimization
 - [x] Hyperparameter tuning with Optuna
