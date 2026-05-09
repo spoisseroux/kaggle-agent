@@ -172,7 +172,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         status_msg += f"System: {system_status.get('state', 'unknown')}\n"
         status_msg += f"GPU: {gpu_status.get('utilization', 'N/A')}% | {gpu_status.get('memory_used', 'N/A')}/{gpu_status.get('memory_total', 'N/A')} MB\n"
 
-        pending = get_pending_count()
+        from core.message_bus import get_pending_instructions
+        pending = len(get_pending_instructions(claim=False))
         if pending > 0:
             status_msg += f"\nPending messages: {pending}"
 

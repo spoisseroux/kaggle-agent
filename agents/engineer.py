@@ -15,7 +15,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.langfuse_tracker import track_decision
-from core.ollama_client import generate as ask_ollama
+from core.openrouter_client import generate as ask_openrouter
 from core import memory
 
 
@@ -172,7 +172,13 @@ Generate ONLY the Python code (no markdown, no explanations):
 """
 
     try:
-        code = ask_ollama(prompt, model="qwen3:14b", think=True, max_tokens=4096, timeout_s=180.0)
+        code = ask_openrouter(
+            prompt,
+            model="deepseek/deepseek-v4-pro-20260423",
+            temperature=0.2,
+            max_tokens=4096,
+            timeout_s=180.0
+        )
 
         # Clean up markdown code blocks if present
         if "```python" in code:
