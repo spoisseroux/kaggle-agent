@@ -256,9 +256,18 @@ class MultiAgentOrchestrator:
 
     def _update_state_from_task(self, task: Dict[str, Any], result: Dict[str, Any]) -> None:
         """Update state with task outputs."""
+        # Handle error case (result might be string or dict)
+        if isinstance(result, str):
+            log.warning(f"Result is string, not dict: {result[:100]}")
+            return
+
+        if not isinstance(result, dict):
+            log.warning(f"Result is not dict: {type(result)}")
+            return
+
         # Store code
         if "code" in result:
-            code_key = task["name"].lower().replace(" ", "_") + "_code"
+            code_key = task.get("name", "unknown").lower().replace(" ", "_") + "_code"
             self.state[code_key] = result["code"]
 
         # Store artifacts

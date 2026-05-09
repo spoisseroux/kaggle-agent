@@ -26,6 +26,12 @@ import logging
 from core.ollama_client import generate as ollama_generate
 from core.ask_human import ask
 
+try:
+    from core.model_config import get_agent_model
+    MODEL_CONFIG_AVAILABLE = True
+except ImportError:
+    MODEL_CONFIG_AVAILABLE = False
+
 log = logging.getLogger(__name__)
 
 
@@ -57,6 +63,9 @@ def get_llm_response(
     max_tokens: int = 4000,
     reason: Optional[str] = None,
     timeout: float = 120.0,
+    agent: Optional[str] = None,
+    task_type: Optional[str] = None,
+    competition: Optional[str] = None,
 ) -> str:
     """
     Get LLM response with automatic routing.
@@ -75,7 +84,11 @@ def get_llm_response(
         LLM response text
     """
     if mode == LLMMode.LOCAL:
-        return _call_ollama(prompt, system, think, temperature, max_tokens, timeout)
+        # Get model for agent if available
+        model = None
+        if MODEL_CONFIG_AVAILABLE and agent:
+            model = get_agent_model(agent, task_type, competition)
+        return _call_ollama(prompt, system, think, temperature, max_tokens, timeout, model)
     elif mode == LLMMode.CLAUDE:
         return _call_claude(prompt, system, temperature, max_tokens, reason)
     else:
@@ -89,11 +102,13 @@ def _call_ollama(
     temperature: float,
     max_tokens: int,
     timeout: float,
+    model: Optional[str] = None,
 ) -> str:
-    """Call local Ollama (qwen3:14b)."""
+    """Call local Ollama with dynamic model selection."""
     try:
         return ollama_generate(
             prompt,
+            model=model or "qwen3:14b",  # Use specified model or default
             system=system,
             think=think,
             temperature=temperature,

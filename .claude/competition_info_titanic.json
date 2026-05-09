@@ -14,7 +14,7 @@
     },
     {
       "name": "Survived",
-      "type": "numeric",
+      "type": "binary",
       "missing_pct": 0.0
     },
     {
@@ -35,7 +35,7 @@
     {
       "name": "Age",
       "type": "numeric",
-      "missing_pct": 0.0
+      "missing_pct": 0.2
     },
     {
       "name": "SibSp",
@@ -60,7 +60,7 @@
     {
       "name": "Cabin",
       "type": "text",
-      "missing_pct": 0.5
+      "missing_pct": 0.77
     },
     {
       "name": "Embarked",
@@ -74,19 +74,16 @@
     "distribution": "imbalanced"
   },
   "known_issues": [
-    "Test set is small and may allow overfitting",
-    "External data sources can lead to perfect scores",
-    "Tutorial nature of the competition"
+    "Small test set (~400 rows) - prone to overfitting",
+    "External historical records available (can achieve 1.0 score)",
+    "Tutorial competition - not representative of real-world ML"
   ],
   "winning_approaches": [
-    "Title extraction from names",
-    "Family size feature engineering",
-    "Age and fare binning",
-    "Handling missing values in Cabin and Embarked",
-    "Ensemble models (Random Forest, XGBoost, LightGBM)",
-    "Logistic regression as baseline"
+    "Feature engineering: Title extraction, family size, age/fare binning, cabin deck extraction",
+    "Missing value handling: Age filled by Pclass/Sex median, Embarked filled with mode, Cabin treated as 'Unknown'",
+    "Models: Random Forest, XGBoost, LightGBM, ensembles of 3-5 models, logistic regression as baseline"
   ],
-  "summary": "Predicting survival on the Titanic using passenger data. Key challenges include handling missing data, effective feature engineering, and avoiding overfitting on the small test set.",
+  "summary": "The Titanic competition requires predicting survival based on passenger data. Key challenges include handling missing values (especially in Age and Cabin), feature engineering (e.g., extracting titles from names), and avoiding overfitting on the small test set. The target variable (Survived) is binary and imbalanced, with evaluation based on accuracy. Many participants achieve perfect scores using historical records, but the tutorial nature of the competition limits its real-world applicability.",
   "competition_slug": "titanic",
   "data_dir": "data/titanic"
 }
