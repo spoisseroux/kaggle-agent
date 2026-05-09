@@ -30,7 +30,7 @@ _load_env()
 from telegram import Update  # noqa: E402
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes  # noqa: E402
 
-from core.message_bus import init_db, post_human_message, wake_agent, get_pending_count  # noqa: E402
+from core.message_bus import init_db, post_human_message, wake_agent  # noqa: E402
 from core.notify import send_telegram  # noqa: E402
 
 logging.basicConfig(
@@ -105,10 +105,16 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not update.message or not update.message.text:
         return
 
+    # Log the chat_id for debugging
+    chat_id = str(update.message.chat_id)
+    chat_type = update.message.chat.type
+    username = update.message.from_user.username if update.message.from_user else "Unknown"
+    log.warning(f"MESSAGE RECEIVED: chat_id={chat_id}, type={chat_type}, from={username}, text={update.message.text[:50]}")
+
     # Check authorization
     authorized, auth_reason = is_authorized(update)
     if not authorized:
-        log.warning(auth_reason)
+        log.warning(f"REJECTED: {auth_reason}")
         return
 
     # Check if we should respond
@@ -207,8 +213,9 @@ async def cmd_queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     try:
-        pending = get_pending_count()
-        msg = f"📬 Pending messages: {pending}"
+        from core.message_bus import get_pending_instructions
+        pending = len(get_pending_instructions(claim=False))
+        msg = f"📬 Pending instructions: {pending}"
         await update.message.reply_text(msg)
     except Exception as e:
         log.error(f"Error in /queue: {e}")
