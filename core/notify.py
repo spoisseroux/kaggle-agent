@@ -32,7 +32,13 @@ def _load_env() -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, _, v = line.partition("=")
-        os.environ.setdefault(k.strip(), v.strip())
+        key = k.strip()
+        val = v.strip()
+        # Force override for TELEGRAM_CHAT_ID to use .env value
+        if key == "TELEGRAM_CHAT_ID":
+            os.environ[key] = val
+        else:
+            os.environ.setdefault(key, val)
 
 
 def _split_message(text: str) -> list[str]:
