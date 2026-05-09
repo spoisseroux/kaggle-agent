@@ -68,6 +68,7 @@ def _split_message(text: str) -> list[str]:
 
 
 def send_telegram(text: str) -> bool:
+    _load_env()  # Ensure .env is loaded with correct TELEGRAM_CHAT_ID
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
