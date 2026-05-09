@@ -8,7 +8,18 @@ Wraps key operations with Langfuse traces so we can observe:
 import os
 import functools
 from typing import Any, Callable, Optional
-from langfuse.decorators import observe, langfuse_context
+
+# Try to import Langfuse, but make it optional
+try:
+    from langfuse import observe, Langfuse
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    # Create no-op decorator if Langfuse not available
+    def observe(name=None, as_type=None):
+        def decorator(func):
+            return func
+        return decorator
 
 # Initialize Langfuse
 os.environ.setdefault("LANGFUSE_PUBLIC_KEY", os.getenv("LANGFUSE_PUBLIC_KEY", ""))
@@ -30,26 +41,8 @@ def track_experiment(name: str, metadata: Optional[dict] = None):
         @observe(name=name, as_type="generation")
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Add metadata to trace
-            if metadata:
-                langfuse_context.update_current_observation(metadata=metadata)
-
-            # Execute function
+            # Execute function (Langfuse observe handles tracing)
             result = func(*args, **kwargs)
-
-            # Log result metrics if it's a dict with score
-            if isinstance(result, dict):
-                if "cv_score" in result:
-                    langfuse_context.score_current_observation(
-                        name="cv_score",
-                        value=result["cv_score"]
-                    )
-                if "lb_score" in result:
-                    langfuse_context.score_current_observation(
-                        name="lb_score",
-                        value=result["lb_score"]
-                    )
-
             return result
         return wrapper
     return decorator
@@ -69,17 +62,7 @@ def track_decision(decision_type: str, context: Optional[dict] = None):
         @observe(name=f"decision_{decision_type}", as_type="span")
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if context:
-                langfuse_context.update_current_observation(metadata=context)
-
             result = func(*args, **kwargs)
-
-            # Log the decision
-            if isinstance(result, dict):
-                langfuse_context.update_current_observation(
-                    output=result
-                )
-
             return result
         return wrapper
     return decorator
@@ -97,7 +80,8 @@ def manual_trace(name: str, input_data: Any, output_data: Any, metadata: Optiona
             metadata={"approach": "added_lags_and_rolling"}
         )
     """
-    from langfuse import Langfuse
+    if not LANGFUSE_AVAILABLE or not is_configured():
+        return
 
     langfuse = Langfuse()
     trace = langfuse.trace(
@@ -115,21 +99,21 @@ def track_phase(phase_name: str, competition: str):
     Track completion of a workflow phase.
 
     Usage:
-        with track_phase("feature_engineering", "store-sales"):
-            # do work
-            pass
+        track_phase("feature_engineering", "store-sales")
     """
-    @observe(name=f"phase_{phase_name}", as_type="span")
-    def _track():
-        langfuse_context.update_current_trace(
-            user_id="kaggle-agent",
-            metadata={
-                "competition": competition,
-                "phase": phase_name
-            }
-        )
+    if not LANGFUSE_AVAILABLE or not is_configured():
+        return
 
-    return _track()
+    langfuse = Langfuse()
+    trace = langfuse.trace(
+        name=f"phase_{phase_name}",
+        metadata={
+            "competition": competition,
+            "phase": phase_name
+        }
+    )
+    trace.update()
+    langfuse.flush()
 
 
 # Helper to check if Langfuse is properly configured
