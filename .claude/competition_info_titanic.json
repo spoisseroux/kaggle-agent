@@ -14,7 +14,7 @@
     },
     {
       "name": "Survived",
-      "type": "binary",
+      "type": "numeric",
       "missing_pct": 0.0
     },
     {
@@ -60,12 +60,12 @@
     {
       "name": "Cabin",
       "type": "text",
-      "missing_pct": 0.77
+      "missing_pct": 0.8
     },
     {
       "name": "Embarked",
       "type": "categorical",
-      "missing_pct": 0.0
+      "missing_pct": 0.1
     }
   ],
   "target_info": {
@@ -80,10 +80,10 @@
   ],
   "winning_approaches": [
     "Feature engineering: Title extraction, family size, age/fare binning, cabin deck extraction",
-    "Missing value handling: Age filled by Pclass/Sex median, Embarked filled with mode, Cabin treated as 'Unknown'",
+    "Handling missing values: Age imputed by Pclass/Sex, Embarked filled with mode, Cabin treated as 'Unknown'",
     "Models: Random Forest, XGBoost, LightGBM, ensembles of 3-5 models, logistic regression as baseline"
   ],
-  "summary": "The Titanic competition requires predicting survival based on passenger data. Key challenges include handling missing values (especially in Age and Cabin), feature engineering (e.g., extracting titles from names), and avoiding overfitting on the small test set. The target variable (Survived) is binary and imbalanced, with evaluation based on accuracy. Many participants achieve perfect scores using historical records, but the tutorial nature of the competition limits its real-world applicability.",
+  "summary": "The Titanic competition requires predicting survival based on passenger data. Key challenges include handling missing values (especially in Age and Cabin), small test set vulnerability to overfitting, and leveraging domain knowledge (e.g., historical records). Winning approaches focus on feature engineering, robust imputation, and ensemble modeling.",
   "competition_slug": "titanic",
   "data_dir": "data/titanic"
 }

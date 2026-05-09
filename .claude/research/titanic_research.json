@@ -1,0 +1,145 @@
+{
+  "problem_analysis": {
+    "problem_category": "tabular",
+    "complexity": "beginner",
+    "key_challenges": [
+      "Small test set prone to overfitting",
+      "Handling missing values and imbalanced target distribution"
+    ],
+    "data_characteristics": {
+      "size": "small",
+      "quality": "clean",
+      "balance": "imbalanced",
+      "missingness": "moderate"
+    },
+    "success_factors": [
+      "Feature engineering",
+      "Robust imputation techniques",
+      "Ensemble modeling",
+      "Leveraging domain knowledge"
+    ],
+    "competitive_landscape": "tutorial"
+  },
+  "similar_competitions": [],
+  "recommended_approaches": [
+    {
+      "name": "Robust Missing Value Handling",
+      "priority": 1,
+      "description": "Impute missing values using predictive techniques (e.g., KNN imputation or model-based imputation). For categorical variables, use mode with a 'Missing' category. For numerical variables, use domain-specific imputation (e.g., age by Pclass/Sex).",
+      "rationale": "Proper imputation reduces noise and prevents models from learning incorrect patterns. Small test sets require stable training data to avoid overfitting.",
+      "estimated_effort": "medium",
+      "expected_improvement": "moderate"
+    },
+    {
+      "name": "Feature Engineering for Interactions",
+      "priority": 2,
+      "description": "Create features like 'Title' from names, 'FamilySize' (SibSp + Parch), and binned versions of age/fare. Extract cabin deck information if available. Add interaction terms (e.g., Pclass * Age).",
+      "rationale": "These features capture meaningful patterns observed in similar competitions and help models generalize better on small test sets.",
+      "estimated_effort": "medium",
+      "expected_improvement": "moderate"
+    },
+    {
+      "name": "Ensemble of Simple Models",
+      "priority": 3,
+      "description": "Combine predictions from Random Forest, XGBoost, and Logistic Regression using simple averaging or stacking. Use cross-validation to prevent overfitting.",
+      "rationale": "Ensembling reduces variance and improves accuracy. Cross-validation ensures models generalize well to the small test set.",
+      "estimated_effort": "medium",
+      "expected_improvement": "significant"
+    },
+    {
+      "name": "Class Weight Adjustment",
+      "priority": 4,
+      "description": "Use class weights in models (e.g., XGBoost's scale_pos_weight) to address target imbalance. Consider SMOTE for oversampling minority classes during training.",
+      "rationale": "Imbalanced data leads to biased models. Adjusting weights improves minority class recall, which indirectly boosts accuracy.",
+      "estimated_effort": "low",
+      "expected_improvement": "moderate"
+    },
+    {
+      "name": "Regularization and Simplification",
+      "priority": 5,
+      "description": "Apply L2 regularization in models like Logistic Regression and Random Forest. Simplify complex features if overfitting is detected during validation.",
+      "rationale": "Regularization combats overfitting on small test sets. Simplification ensures models remain generalizable.",
+      "estimated_effort": "low",
+      "expected_improvement": "baseline"
+    }
+  ],
+  "model_recommendations": [
+    {
+      "name": "Logistic Regression",
+      "priority": 1,
+      "rationale": "Simple, interpretable, and effective for small datasets with proper regularization to prevent overfitting.",
+      "suggested_config": {
+        "penalty": "l2",
+        "C": 1e-05,
+        "solver": "liblinear",
+        "max_iter": 1000
+      },
+      "ollama_model_recommendation": "deepseek-coder:33b",
+      "training_time_estimate": "under 1 minute"
+    },
+    {
+      "name": "Decision Tree",
+      "priority": 2,
+      "rationale": "Handles small data well with explicit control over depth and pruning to avoid overfitting.",
+      "suggested_config": {
+        "max_depth": 3,
+        "min_samples_split": 5,
+        "criterion": "gini"
+      },
+      "ollama_model_recommendation": "qwen3:14b",
+      "training_time_estimate": "under 1 minute"
+    },
+    {
+      "name": "k-Nearest Neighbors (KNN)",
+      "priority": 3,
+      "rationale": "Non-parametric method suitable for small datasets when paired with careful hyperparameter tuning.",
+      "suggested_config": {
+        "n_neighbors": 3,
+        "weights": "uniform",
+        "metric": "euclidean"
+      },
+      "ollama_model_recommendation": "codellama:34b",
+      "training_time_estimate": "under 1 minute"
+    }
+  ],
+  "feature_strategies": [],
+  "pitfalls": [
+    {
+      "issue": "Overfitting to the small test set",
+      "severity": "critical",
+      "description": "A small test set (~400 rows) increases the risk of models memorizing test patterns rather than generalizing, leading to inflated performance metrics that collapse in real-world scenarios.",
+      "mitigation": "Use rigorous cross-validation (e.g., stratified k-fold) with the training data, apply regularization, and prioritize model simplicity."
+    },
+    {
+      "issue": "Data leakage from external historical records",
+      "severity": "critical",
+      "description": "Using external data (e.g., historical records) risks achieving artificially high scores by exploiting information not available in the competition's dataset, violating fairness and generalizability.",
+      "mitigation": "Strictly use only the provided data; avoid any external sources unless explicitly permitted by competition rules."
+    },
+    {
+      "issue": "Metric gaming due to imbalanced classes",
+      "severity": "high",
+      "description": "Imbalanced data may incentivize models to prioritize majority classes, leading to poor performance on underrepresented classes despite seemingly good overall metrics (e.g., accuracy).",
+      "mitigation": "Use appropriate evaluation metrics (e.g., F1, AUC-ROC) and apply techniques like class weighting, resampling, or cost-sensitive learning."
+    },
+    {
+      "issue": "Ignoring missing data patterns",
+      "severity": "medium",
+      "description": "Moderate missingness may contain meaningful patterns (e.g., missing not at random), but improper handling (e.g., naive imputation) can introduce bias or lose critical information.",
+      "mitigation": "Analyze missingness mechanisms, use advanced imputation (e.g., MICE), and consider modeling missingness as a feature if justified."
+    },
+    {
+      "issue": "Over-reliance on tutorial simplifications",
+      "severity": "medium",
+      "description": "The tutorial nature may encourage simplistic approaches (e.g., default models) that fail to address real-world complexities like data drift or feature engineering.",
+      "mitigation": "Apply rigorous validation, experiment with feature engineering, and benchmark against diverse baselines."
+    }
+  ],
+  "resource_estimate": {
+    "per_approach_time": "1-2 hours",
+    "total_time_estimate": "15-30 hours",
+    "compute_requirements": "CPU sufficient",
+    "gpu_recommended": false,
+    "parallel_tasks": 3
+  }
+}

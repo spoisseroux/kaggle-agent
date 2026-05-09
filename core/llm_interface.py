@@ -150,31 +150,23 @@ def _escalate_to_claude_code(
     reason: Optional[str],
 ) -> str:
     """
-    Escalate to Claude Code via ask_human.py.
+    Internal escalation - use Ollama with enhanced reasoning.
 
-    The agent asks the user (Claude Code top-level orchestrator) for help.
-    Claude Code sees the request and provides the response.
+    Note: Can't truly escalate to Claude Code when already running in it.
+    Instead, use Ollama with think=True for better reasoning.
+    For real Claude escalation, set CLAUDE_BACKEND=claude_api.
     """
-    escalation_message = f"""
-🧠 Agent needs Claude reasoning:
+    log.info(f"Escalation requested ({reason}) - using Ollama with enhanced reasoning")
 
-Reason: {reason or "Complex task requiring strategic thinking"}
-
-System context: {system or "None"}
-
-Task:
-{prompt}
-
-Please provide your response below.
-"""
-
-    log.info(f"Escalating to Claude Code: {reason}")
-
-    # ask sends to Telegram and waits for reply
-    # In this case, the "human" is actually Claude Code orchestrator
-    response = ask(escalation_message)
-
-    return response
+    # Use Ollama with thinking mode for better results
+    return _call_ollama(
+        prompt,
+        system,
+        think=True,  # Enable thinking for complex tasks
+        temperature=0.1,  # Lower temp for focused output
+        max_tokens=4000,
+        timeout=180.0,
+    )
 
 
 def _call_claude_api(

@@ -16,8 +16,11 @@ import logging
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-from core.llm_interface import ask_ollama
+from core.llm_interface import ask_ollama, ask_claude
 from core.semantic_search import search_code
+
+# Research agent uses Claude for better reasoning + web search capability
+USE_CLAUDE_FOR_RESEARCH = True
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +120,10 @@ Return ONLY the JSON object.
 
     system = "You are a data science competition analyst with expertise in identifying problem patterns."
 
-    response = ask_ollama(prompt, system=system, think=True)
+    if USE_CLAUDE_FOR_RESEARCH:
+        response = ask_claude(prompt, system=system, reason="Research: Problem analysis")
+    else:
+        response = ask_ollama(prompt, system=system, think=True)
 
     try:
         # Parse JSON
@@ -220,7 +226,10 @@ Return ONLY the JSON object.
 
     system = "You are a Kaggle competitions expert. Recommend practical, high-ROI approaches."
 
-    response = ask_ollama(prompt, system=system, think=True)
+    if USE_CLAUDE_FOR_RESEARCH:
+        response = ask_claude(prompt, system=system, reason="Research: Approach recommendations")
+    else:
+        response = ask_ollama(prompt, system=system, think=True)
 
     try:
         response_clean = response.strip()
@@ -275,7 +284,10 @@ Return ONLY the JSON object.
 
     system = "You are a machine learning expert. Recommend models that balance performance and practicality."
 
-    response = ask_ollama(prompt, system=system, think=True)
+    if USE_CLAUDE_FOR_RESEARCH:
+        response = ask_claude(prompt, system=system, reason="Research: Model recommendations")
+    else:
+        response = ask_ollama(prompt, system=system, think=True)
 
     try:
         response_clean = response.strip()
@@ -360,7 +372,10 @@ Return ONLY the JSON object.
 
     system = "You are a cautious data scientist. Identify risks and suggest mitigations."
 
-    response = ask_ollama(prompt, system=system, think=False)
+    if USE_CLAUDE_FOR_RESEARCH:
+        response = ask_claude(prompt, system=system, reason="Research: Pitfall identification")
+    else:
+        response = ask_ollama(prompt, system=system, think=False)
 
     try:
         response_clean = response.strip()

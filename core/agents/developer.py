@@ -191,6 +191,13 @@ def _execute_code(code: str, state: Dict[str, Any]) -> Dict[str, Any]:
         temp_path = f.name
 
     try:
+        # Add project root to PYTHONPATH so imports work
+        import os
+        env = os.environ.copy()
+        project_root = str(Path.cwd())
+        pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{project_root}:{pythonpath}" if pythonpath else project_root
+
         # Execute with timeout
         result = subprocess.run(
             ["python", temp_path],
@@ -198,6 +205,7 @@ def _execute_code(code: str, state: Dict[str, Any]) -> Dict[str, Any]:
             text=True,
             timeout=300,  # 5 min timeout
             cwd=str(Path.cwd()),
+            env=env,  # Pass modified environment
         )
 
         if result.returncode == 0:
