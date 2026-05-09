@@ -24,7 +24,7 @@ from typing import Optional, Dict, Any
 import logging
 
 from core.ollama_client import generate as ollama_generate
-from core.ask_human import ask_human
+from core.ask_human import ask
 
 log = logging.getLogger(__name__)
 
@@ -155,9 +155,9 @@ Please provide your response below.
 
     log.info(f"Escalating to Claude Code: {reason}")
 
-    # ask_human sends to Telegram and waits for reply
+    # ask sends to Telegram and waits for reply
     # In this case, the "human" is actually Claude Code orchestrator
-    response = ask_human(escalation_message)
+    response = ask(escalation_message)
 
     return response
 

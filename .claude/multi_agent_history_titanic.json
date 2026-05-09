@@ -1,0 +1,93 @@
+{
+  "competition_slug": "titanic",
+  "phases_completed": 0,
+  "history": [],
+  "final_state": {
+    "competition_slug": "titanic",
+    "data_dir": "data/titanic",
+    "competition_info": {
+      "problem_type": "classification",
+      "eval_metric": "accuracy",
+      "data_shape": {
+        "train_rows": 10,
+        "train_cols": 12,
+        "test_rows": 5
+      },
+      "features": [
+        {
+          "name": "PassengerId",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Survived",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Pclass",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Name",
+          "type": "text",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Sex",
+          "type": "categorical",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Age",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "SibSp",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Parch",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Ticket",
+          "type": "text",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Fare",
+          "type": "numeric",
+          "missing_pct": 0.0
+        },
+        {
+          "name": "Cabin",
+          "type": "text",
+          "missing_pct": 0.5
+        },
+        {
+          "name": "Embarked",
+          "type": "categorical",
+          "missing_pct": 0.0
+        }
+      ],
+      "target_info": {
+        "name": "Survived",
+        "type": "binary",
+        "distribution": "imbalanced"
+      },
+      "known_issues": [
+        "Test set is small and can be gamed",
+        "Many participants achieve perfect scores using external historical records"
+      ],
+      "winning_approaches": [],
+      "summary": "The competition involves predicting passenger survival on the Titanic based on features like age, gender, class, and family relationships. Key challenges include handling missing data (e.g., Age, Cabin), engineering meaningful features from text (e.g., names, tickets), and addressing class imbalances. The test set's small size and potential for overfitting add complexity.",
+      "competition_slug": "titanic",
+      "data_dir": "data/titanic"
+    }
+  }
+}

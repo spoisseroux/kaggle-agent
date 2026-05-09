@@ -18,7 +18,6 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 from core.llm_interface import ask_ollama
-from core.format_telegram import format_phase_summary
 
 log = logging.getLogger(__name__)
 

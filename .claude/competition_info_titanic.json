@@ -1,0 +1,92 @@
+{
+  "problem_type": "classification",
+  "eval_metric": "accuracy",
+  "data_shape": {
+    "train_rows": 10,
+    "train_cols": 12,
+    "test_rows": 5
+  },
+  "features": [
+    {
+      "name": "PassengerId",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Survived",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Pclass",
+      "type": "categorical",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Name",
+      "type": "text",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Sex",
+      "type": "categorical",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Age",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "SibSp",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Parch",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Ticket",
+      "type": "text",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Fare",
+      "type": "numeric",
+      "missing_pct": 0.0
+    },
+    {
+      "name": "Cabin",
+      "type": "text",
+      "missing_pct": 0.5
+    },
+    {
+      "name": "Embarked",
+      "type": "categorical",
+      "missing_pct": 0.0
+    }
+  ],
+  "target_info": {
+    "name": "Survived",
+    "type": "binary",
+    "distribution": "imbalanced"
+  },
+  "known_issues": [
+    "Test set is small and may allow overfitting",
+    "External data sources can lead to perfect scores",
+    "Tutorial nature of the competition"
+  ],
+  "winning_approaches": [
+    "Title extraction from names",
+    "Family size feature engineering",
+    "Age and fare binning",
+    "Handling missing values in Cabin and Embarked",
+    "Ensemble models (Random Forest, XGBoost, LightGBM)",
+    "Logistic regression as baseline"
+  ],
+  "summary": "Predicting survival on the Titanic using passenger data. Key challenges include handling missing data, effective feature engineering, and avoiding overfitting on the small test set.",
+  "competition_slug": "titanic",
+  "data_dir": "data/titanic"
+}
