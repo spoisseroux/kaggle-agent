@@ -51,13 +51,16 @@ class LLMMode(Enum):
 class LLMBackend(Enum):
     """Claude backend implementation."""
     CLAUDE_CODE = "claude_code"  # Current: escalate via ask_human.py
-    CLAUDE_API = "claude_api"    # Future: direct API calls
+    CLAUDE_API = "claude_api"    # Direct Anthropic API calls
+    OPENROUTER = "openrouter"    # OpenRouter for cheaper models
 
 
 # Configuration
 CLAUDE_BACKEND = os.environ.get("CLAUDE_BACKEND", "claude_code")
 CLAUDE_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-coder")
 
 
 def get_llm_response(
@@ -160,7 +163,8 @@ def _call_claude(
 
     Backends:
     - claude_code: Escalate to Claude Code via ask_human.py (current)
-    - claude_api: Direct API call via Anthropic SDK (future)
+    - claude_api: Direct API call via Anthropic SDK
+    - openrouter: OpenRouter for cheaper models
     """
     backend = LLMBackend(CLAUDE_BACKEND)
     start_time = time.time()
@@ -170,6 +174,8 @@ def _call_claude(
             response = _escalate_to_claude_code(prompt, system, reason)
         elif backend == LLMBackend.CLAUDE_API:
             response = _call_claude_api(prompt, system, temperature, max_tokens)
+        elif backend == LLMBackend.OPENROUTER:
+            response = _call_openrouter(prompt, system, temperature, max_tokens)
         else:
             raise ValueError(f"Unknown Claude backend: {backend}")
 
@@ -318,3 +324,43 @@ if __name__ == "__main__":
     for agent, context, attempt, error in tests:
         should, reason = should_escalate(agent, context, attempt, error)
         print(f"{agent} (attempt {attempt}): {should} - {reason}")
+
+
+def _call_openrouter(
+    prompt: str,
+    system: Optional[str],
+    temperature: float,
+    max_tokens: int,
+    model: Optional[str] = None,
+) -> str:
+    """
+    Call OpenRouter API for access to various coding models.
+    
+    Requires OPENROUTER_API_KEY env var.
+    Uses OpenAI-compatible API.
+    """
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OPENROUTER_API_KEY not set - get one from https://openrouter.ai/keys")
+    
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError("openai package not installed - run: pip install openai")
+    
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+    
+    messages = [{"role": "user", "content": prompt}]
+    if system:
+        messages.insert(0, {"role": "system", "content": system})
+    
+    response = client.chat.completions.create(
+        model=model or OPENROUTER_MODEL,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    
+    return response.choices[0].message.content

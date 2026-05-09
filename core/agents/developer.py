@@ -460,7 +460,7 @@ def _validate_and_fix_code(code: str) -> str:
 
 
 def _format_tools(tools_library: Dict[str, Any]) -> str:
-    """Format tools library for prompt with correct import paths."""
+    """Format tools library for prompt with correct import paths AND function signatures."""
     if not tools_library:
         return "No tools available yet - implement from scratch using pandas/sklearn."
 
@@ -477,15 +477,17 @@ def _format_tools(tools_library: Dict[str, Any]) -> str:
         module = import_map.get(category, f"core.tools.{category}")
         tools_text.append(f"\n{category} (from {module}):")
 
-        # List functions
+        # List functions with FULL signatures
         func_names = [tool['name'] for tool in tools]
-        tools_text.append(f"  Import: from {module} import {', '.join(func_names[:3])}")
-        if len(func_names) > 3:
-            tools_text.append(f"          # ... and {len(func_names) - 3} more")
+        tools_text.append(f"  Import: from {module} import {', '.join(func_names[:5])}")
+        if len(func_names) > 5:
+            tools_text.append(f"          # ... and {len(func_names) - 5} more")
 
-        # List with descriptions
+        # List with descriptions AND signatures
         for tool in tools:
-            tools_text.append(f"  - {tool['name']}: {tool['description']}")
+            signature = tool.get('signature', f"{tool['name']}(...)")
+            tools_text.append(f"  - {signature}")
+            tools_text.append(f"    {tool['description']}")
 
     return "\n".join(tools_text)
 

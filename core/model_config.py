@@ -16,11 +16,11 @@ log = logging.getLogger(__name__)
 
 # Default model assignments
 DEFAULT_MODELS = {
-    "reader": "qwen3:14b",          # Fast, good at structured extraction
-    "planner": "qwen3:14b",         # Strategic reasoning
-    "developer": "qwen3:14b",       # Code generation
-    "reviewer": "qwen3:14b",        # Code analysis
-    "summarizer": "qwen3:14b",      # Documentation
+    "reader": "qwen3:14b",                  # Fast, good at structured extraction
+    "planner": "qwen3:14b",                 # Strategic reasoning
+    "developer": "qwen2.5-coder:7b",        # Code generation (specialized coding model, 2024)
+    "reviewer": "qwen3:14b",                # Code analysis
+    "summarizer": "qwen3:14b",              # Documentation
 }
 
 # Task-specific overrides (if certain tasks need different models)
