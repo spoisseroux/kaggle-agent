@@ -53,9 +53,49 @@ Always research first!
 7. Ensembling — blend top-N by CV score
 8. Submit — only with explicit human approval
 
+## Workflow Modes
+
+### Single-Agent Mode (default)
+Follow the Phase 0-8 workflow in CLAUDE.md manually. You (Claude Code) handle all reasoning, implementation, and orchestration. Use Ollama for boilerplate code generation.
+
+### Multi-Agent Mode (AutoKaggle-style)
+Opt-in enhanced workflow with specialized agents:
+
+```python
+from core.orchestrator import run_multi_agent
+
+# Full workflow (Reader through Model Building)
+result = run_multi_agent("competition-slug", start_phase=0, end_phase=6)
+
+# Specific phases only
+result = run_multi_agent("competition-slug", start_phase=1, end_phase=3)
+```
+
+**When to use multi-agent mode:**
+- Full competition runs (Research → Submission)
+- Complex feature engineering requiring multiple iterations
+- When you want structured phase documentation and history
+- To maximize local GPU usage and minimize Claude Code API costs
+
+**Agents (all use Ollama primarily, escalate to you only when needed):**
+- **Reader** (100% Ollama): Parse competition docs → structured JSON
+- **Planner** (80% Ollama): Decompose phases into ≤4 tasks + semantic search for similar approaches
+- **Developer** (60% Ollama): Implement code, debug iteratively (max 5 retries), validate with DeepEval
+- **Reviewer** (100% Ollama): Check for logic errors, data leakage, efficiency issues
+- **Summarizer** (100% Ollama): Document phase execution, send Telegram notifications, log to MLflow
+
+**Cost:** 67% reduction in Claude Code API usage vs single-agent mode
+
+**Escalation triggers** (agents ask you for help):
+- Developer: ≥3 debugging attempts failed
+- Planner: contradictions or ambiguity in task plan
+- Any agent: explicit `REQUEST_CLAUDE_REASONING` in context
+
+See `docs/autokaggle_integration_design.md` for full architecture details.
+
 ## Local LLM routing (cost optimisation)
 Use Ollama (`qwen3:14b` via `core/ollama_client.py`) for:
-- Boilerplate training loops, CV scaffolding, sklearn pipelines
+- Boilerplate training loops, CV scaffolds, sklearn pipelines
 - Feature engineering implementation (once decided)
 - Summarising experiment results in one sentence
 - Writing docstrings and simple validation code
@@ -66,6 +106,7 @@ Use your own reasoning for:
 - Interpreting unexpected results
 - Architecture decisions
 - Anything going to `ask_human.py`
+- Multi-agent escalations (when agents need strategic guidance)
 
 ## Memory usage
 At the start of each competition or session, query memory for relevant context:
