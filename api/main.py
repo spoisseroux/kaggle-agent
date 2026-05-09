@@ -39,6 +39,16 @@ from core import ollama_client  # noqa: E402
 from core import system_control  # noqa: E402
 from core.notify import send_telegram  # noqa: E402
 
+# DeepEval integration
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_DSN = os.environ.get("POSTGRES_DSN")
+    DEEPEVAL_ENABLED = bool(POSTGRES_DSN)
+except ImportError:
+    DEEPEVAL_ENABLED = False
+    POSTGRES_DSN = None
+
 API_VERSION = "0.1.0"
 START_TIME = dt.datetime.utcnow()
 
@@ -757,6 +767,134 @@ def memory_status() -> dict:
         "mcp": mc,
         "tailscale": {"connected": connected, "latency_ms": pg.get("latency_ms")},
     }
+
+
+# ---------- DeepEval endpoints ----------
+
+class DeepEvalSubmission(BaseModel):
+    experiment_name: str
+    passed: bool
+    score: float
+    issues: list[str]
+    warnings: list[str]
+    recommendation: str
+    cv_score: float
+    baseline_score: float
+    competition: str | None = None
+
+
+@app.post("/deepeval/submit")
+def submit_deepeval(submission: DeepEvalSubmission):
+    """Submit a DeepEval result."""
+    if not DEEPEVAL_ENABLED:
+        raise HTTPException(503, "DeepEval not configured (missing POSTGRES_DSN)")
+
+    try:
+        conn = psycopg2.connect(POSTGRES_DSN)
+        cur = conn.cursor()
+
+        # Create table if not exists
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS deepeval_results (
+                id SERIAL PRIMARY KEY,
+                experiment_name TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                passed BOOLEAN NOT NULL,
+                score FLOAT NOT NULL,
+                issues JSONB NOT NULL,
+                warnings JSONB NOT NULL,
+                recommendation TEXT NOT NULL,
+                cv_score FLOAT NOT NULL,
+                baseline_score FLOAT NOT NULL,
+                competition TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+
+        # Insert result
+        import time
+        timestamp = int(time.time())
+
+        cur.execute("""
+            INSERT INTO deepeval_results
+            (experiment_name, timestamp, passed, score, issues, warnings, recommendation, cv_score, baseline_score, competition)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            submission.experiment_name,
+            timestamp,
+            submission.passed,
+            submission.score,
+            json.dumps(submission.issues),
+            json.dumps(submission.warnings),
+            submission.recommendation,
+            submission.cv_score,
+            submission.baseline_score,
+            submission.competition or _active_slug(),
+        ))
+
+        result_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {"success": True, "id": result_id}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to store DeepEval result: {e}")
+
+
+@app.get("/deepeval/results")
+def get_deepeval_results(competition: str | None = None, limit: int = 50):
+    """Get DeepEval results, optionally filtered by competition."""
+    if not DEEPEVAL_ENABLED:
+        return []  # Return empty list if not configured
+
+    try:
+        conn = psycopg2.connect(POSTGRES_DSN)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        if competition:
+            cur.execute("""
+                SELECT id, experiment_name, timestamp, passed, score, issues, warnings,
+                       recommendation, cv_score, baseline_score, competition
+                FROM deepeval_results
+                WHERE competition = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """, (competition, limit))
+        else:
+            cur.execute("""
+                SELECT id, experiment_name, timestamp, passed, score, issues, warnings,
+                       recommendation, cv_score, baseline_score, competition
+                FROM deepeval_results
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """, (limit,))
+
+        results = []
+        for row in cur.fetchall():
+            results.append({
+                "id": str(row["id"]),
+                "experiment_name": row["experiment_name"],
+                "timestamp": row["timestamp"],
+                "passed": row["passed"],
+                "score": row["score"],
+                "issues": row["issues"] if isinstance(row["issues"], list) else json.loads(row["issues"]),
+                "warnings": row["warnings"] if isinstance(row["warnings"], list) else json.loads(row["warnings"]),
+                "recommendation": row["recommendation"],
+                "cv_score": row["cv_score"],
+                "baseline_score": row["baseline_score"],
+            })
+
+        cur.close()
+        conn.close()
+
+        return results
+    except Exception as e:
+        # If table doesn't exist yet, return empty list
+        if "does not exist" in str(e):
+            return []
+        raise HTTPException(500, f"Failed to fetch DeepEval results: {e}")
 
 
 # ---------- entrypoint ----------
