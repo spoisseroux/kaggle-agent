@@ -189,6 +189,69 @@ def health() -> dict:
     }
 
 
+# ---------- usage stats ----------
+
+@app.get("/usage/stats")
+def usage_stats() -> dict:
+    """Get GPU vs Claude Code usage statistics."""
+    import sys
+    sys.path.append("/home/keehar/kaggle-agent")
+
+    try:
+        from core.usage_tracker import get_tracker
+        tracker = get_tracker()
+        usage = tracker.get_current_usage()
+
+        # Calculate GPU usage (rough estimate based on multi-agent mode history)
+        # Multi-agent mode = mostly GPU/Ollama
+        # Single-agent mode = mostly Claude Code
+
+        # Get mode history from orchestrator if available
+        try:
+            from core.hybrid_orchestrator import get_orchestrator
+            orchestrator = get_orchestrator()
+            total_tasks = len(orchestrator.mode_history)
+
+            if total_tasks > 0:
+                multi_count = sum(1 for mode, _, _ in orchestrator.mode_history if mode == "multi")
+                single_count = total_tasks - multi_count
+
+                # Rough estimate: multi-agent is 67% GPU, single is 100% Claude
+                gpu_pct = (multi_count * 0.67 + single_count * 0.0) / total_tasks * 100
+                claude_pct = 100 - gpu_pct
+            else:
+                gpu_pct = 0
+                claude_pct = 100
+        except Exception:
+            gpu_pct = 0
+            claude_pct = 100
+
+        return {
+            "gpu_usage_pct": round(gpu_pct, 1),
+            "claude_usage_pct": round(claude_pct, 1),
+            "api_usage": {
+                "minute_tokens": usage["minute_tokens"],
+                "minute_requests": usage["minute_requests"],
+                "day_tokens": usage["day_tokens"],
+                "day_requests": usage["day_requests"],
+                "minute_token_pct": round(usage["minute_token_pct"] * 100, 1),
+                "minute_request_pct": round(usage["minute_request_pct"] * 100, 1),
+                "day_token_pct": round(usage["day_token_pct"] * 100, 1),
+            },
+            "mode_history": {
+                "total_tasks": total_tasks if 'total_tasks' in locals() else 0,
+                "multi_agent": multi_count if 'multi_count' in locals() else 0,
+                "single_agent": single_count if 'single_count' in locals() else 0,
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "gpu_usage_pct": 0,
+            "claude_usage_pct": 100
+        }
+
+
 # ---------- system state machine ----------
 
 @app.get("/system/state")

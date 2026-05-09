@@ -1,13 +1,20 @@
 """Hybrid orchestrator - intelligently switches between single and multi-agent modes."""
 import sys
 import time
+import os
 from pathlib import Path
 from typing import Optional
+from langfuse.decorators import observe, langfuse_context
 
 from core.task_classifier import classify_task, should_use_multiagent as classifier_check
 from core.usage_tracker import get_tracker, record_request, is_rate_limited
 from core.notify import send_telegram
 from core.orchestrator import run_multi_agent
+
+# Initialize Langfuse
+os.environ.setdefault("LANGFUSE_PUBLIC_KEY", os.getenv("LANGFUSE_PUBLIC_KEY", ""))
+os.environ.setdefault("LANGFUSE_SECRET_KEY", os.getenv("LANGFUSE_SECRET_KEY", ""))
+os.environ.setdefault("LANGFUSE_HOST", "http://localhost:3000")
 
 
 class HybridOrchestrator:
@@ -25,30 +32,36 @@ class HybridOrchestrator:
         self.mode_history = []  # Track last N mode decisions
         self.max_history = 10
     
+    @observe(as_type="generation")
     def decide_mode(self, user_input: str) -> tuple[str, str]:
         """
         Decide which mode to use.
-        
+
         Returns:
             (mode, reason) where mode is "single" or "multi"
         """
         # Check rate limits first (highest priority)
         limited, wait_seconds = is_rate_limited()
         if limited:
+            langfuse_context.update_current_observation(metadata={"decision": "rate_limited"})
             return "multi", f"Rate limited - waiting {wait_seconds}s, using multi-agent to conserve API usage"
-        
+
         # Check if approaching limits
         should_conserve, conserve_reason = self.tracker.should_use_multiagent()
         if should_conserve:
+            langfuse_context.update_current_observation(metadata={"decision": "conserve_api"})
             return "multi", conserve_reason
-        
+
         # Classify task complexity
         use_multi, task_reason = classifier_check(user_input)
         if use_multi:
+            langfuse_context.update_current_observation(metadata={"decision": "complex_task"})
             return "multi", task_reason
         else:
+            langfuse_context.update_current_observation(metadata={"decision": "quick_task"})
             return "single", task_reason
     
+    @observe(name="hybrid_execute")
     def execute(
         self,
         user_input: str,
@@ -57,16 +70,27 @@ class HybridOrchestrator:
     ) -> dict:
         """
         Execute a task using the appropriate mode.
-        
+
         Args:
             user_input: User's request
             competition_slug: Optional competition to work on
             phase: Optional phase to run (for multi-agent mode)
-        
+
         Returns:
             Result dict with mode, reason, and output
         """
         mode, reason = self.decide_mode(user_input)
+
+        # Add to Langfuse context
+        langfuse_context.update_current_trace(
+            user_id="kaggle-agent",
+            metadata={
+                "competition": competition_slug,
+                "phase": phase,
+                "mode": mode,
+                "reason": reason
+            }
+        )
         
         # Log decision
         self.mode_history.append((mode, reason, time.time()))
