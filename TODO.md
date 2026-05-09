@@ -2,21 +2,18 @@
 
 ## High Priority
 
-- [ ] **DeepEval Rebuild - Proper Build Loop** 🔄 IN PROGRESS
-  - REPLACE homelab service with built-in evaluation
-  - Use RTX 5070 + Ollama for LLM-based metrics (not 1070)
-  - Build-loop integration: eval → fix → re-eval
-  - Real DeepEval features: test cases, metrics, traces
-  - Evaluates experiments DURING development
-  - Framework: https://www.deepeval.com/docs/vibe-coding
-  - Time: 4-6 hours
+- [x] **DeepEval Integration** ✅ COMPLETE
+  - Built-in evaluation with RTX 5070 + Ollama
+  - LLM-based experiment validation (8-18s per eval)
+  - Pre-submission workflow integration
+  - /eval skill created
+  - Frontend dashboard at /kaggle/deepeval
   
-- [ ] **Eval Platform GUI**
+- [x] **Eval Platform GUI** ✅ COMPLETE
   - Frontend dashboard for evaluation results
-  - View metrics, traces, test cases
-  - Track eval history across experiments
-  - Integration with frontend (access needed)
-  - Time: 3-4 hours
+  - Stats cards, eval history table
+  - Pass/fail indicators, issues/warnings
+  - Deployed via Vercel
 
 - [x] **Better Telegram Formatting** ✅ COMPLETE
   - Created core/format_telegram.py
@@ -32,7 +29,7 @@
   - Time: 3-4 hours
 
 - [ ] **New Skills**
-  - [ ] `/eval` - Run DeepEval metrics on experiment
+  - [x] `/eval` - Run DeepEval metrics on experiment ✅ COMPLETE
   - [ ] `/search-similar` - Semantic code search
   - [ ] `/replay` - Re-execute experiment with changes
   - Time: 1-2 hours per skill
