@@ -149,17 +149,23 @@ Success Criteria: {experiment.get('success_criteria', 'N/A')}
 {error_context}
 
 REQUIREMENTS:
-1. Use existing code patterns from the competition directory
+1. Use standard Python imports ONLY (no custom module paths)
 2. Save results to MLflow
 3. Print clear progress messages
 4. Handle errors gracefully
 5. Return results dict with: {{"cv_score": float, "lb_score": float | None, "success": bool}}
 
+CRITICAL IMPORT RULES:
+- Use ONLY standard libraries: pandas, numpy, sklearn, xgboost, lightgbm, catboost
+- For data files, use: pd.read_csv("data/{competition}/train.csv")
+- DO NOT use imports like: from competitions.active.{competition}...
+- DO NOT create custom modules - all code in one file
+- Use pathlib.Path for file paths
+
 IMPORTANT:
-- Import from correct paths (competitions/active/{competition}/...)
 - Use TimeSeriesSplit for time series data
 - Log to MLflow before and after training
-- Save submission file to submissions/ directory
+- Save submission to: competitions/active/{competition}/submissions/
 - Do NOT submit to Kaggle (submission requires human approval)
 
 Generate ONLY the Python code (no markdown, no explanations):
