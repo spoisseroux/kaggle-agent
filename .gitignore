@@ -38,3 +38,13 @@ message_bus.sqlite3
 message_bus.sqlite3-*
 state.json
 
+
+# Test files and artifacts
+test_*.py
+*.png
+*.pdf
+*_report.txt
+*_report.md
+output.md
+catboost_info/
+plots/
