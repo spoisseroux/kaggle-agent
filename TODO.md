@@ -22,15 +22,16 @@
 
 ## Medium Priority
 
-- [ ] **Enhanced Qdrant Semantic Search**
+- [x] **Enhanced Qdrant Semantic Search** ✅ COMPLETE
+  - Local embeddings on RTX 5070 (3x faster)
   - Index all past competition code
   - Semantic search: "find similar lag features"
   - Cross-competition learning
-  - Time: 3-4 hours
+  - Code indexer + semantic search + /search-similar skill
 
 - [ ] **New Skills**
   - [x] `/eval` - Run DeepEval metrics on experiment ✅ COMPLETE
-  - [ ] `/search-similar` - Semantic code search
+  - [x] `/search-similar` - Semantic code search ✅ COMPLETE
   - [ ] `/replay` - Re-execute experiment with changes
   - Time: 1-2 hours per skill
 
