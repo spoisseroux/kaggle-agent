@@ -83,46 +83,53 @@ Best 12 features (95% of predictive power):
 
 **DO NOT USE v14, v15, or v16 for submission.**
 
-## Current Best Models (Holdout Validation)
+## Current Best Models (Holdout Validation + LB Confirmed)
 
-### v16 - Ensemble XGBoost + LightGBM (CURRENT BEST) 🎉
-- **Holdout CV**: 0.1873 ⭐⭐⭐⭐⭐
-- **Expected LB**: ~0.20-0.21 (based on validated 9.3% gap)
-- **Architecture**: Weighted ensemble
-  - LightGBM with advanced features: 0.2031 CV (70% weight)
-  - XGBoost v15: 0.5222 CV (30% weight)
-- **Key Discovery**: LightGBM + advanced features = massive improvement
-  - Previous LightGBM (v2, simple features): 0.405 CV
-  - With v14 advanced features: 0.203 CV (51% better!)
-- **Improvement**: 61.3% vs v1 baseline
-- **File**: `ensemble_v16_xgb_lgbm_01873.csv`
-
-### v15 - Optuna Tuned Advanced Features
-- **Holdout CV**: 0.3648
-- **Expected LB**: ~0.40
-- **Features**: 27 advanced features
-- **Improvement**: 24.7% vs v1 baseline
-- **Best params**: lr=0.058, depth=7, min_child=1, subsample=0.91
-- **File**: `xgb_v15_optuna_adv_03648.csv`
-
-### v14 - Advanced Features
-- **Holdout CV**: 0.4640
-- **Expected LB**: ~0.50
-- **Features**: 27 total (EWMA, WoW_diff, interactions, temporal, clustering)
-- **Top features**: Roll_mean_7, onpromotion, Lag_7, EWMA_7, WoW_diff
-- **Improvement**: 4.2% vs v1 baseline
-- **File**: `xgb_v14_advanced_04640.csv`
-
-### v1_baseline_holdout (Validated)
+### v1_baseline_holdout (CURRENT BEST) ✅
 - **Holdout CV**: 0.4842
 - **Actual LB**: 0.5291
-- **Gap**: 0.045 (9.3%) ✅
-- **Validation proof**: 30-day holdout works!
+- **Gap**: 8.5% ✅ VALIDATED
+- **Features**: 12 proven features (lags 3/7, rolling means 7/14/30/60/90, roll_std_7, day_of_week, is_weekend, is_holiday, onpromotion)
+- **Model**: XGBoost with manual hyperparameters
 - **File**: `xgb_v1_baseline_holdout_04842.csv`
+- **Rank**: Best validated submission
 
-### Previous Models
-- v2_fixed_lags_holdout: 0.5177 holdout CV
-- optuna_holdout: 0.5615 holdout CV
+### v18 - Optuna on v1 Features
+- **Holdout CV**: 0.4872
+- **Actual LB**: 0.5334
+- **Gap**: 9.5%
+- **Result**: 0.62% worse than v1 in CV, 0.81% worse on LB ❌
+- **Lesson**: v1 hyperparameters already optimal, Optuna didn't help
+- **File**: `xgb_v18_v1_optuna_04872.csv`
+
+### v19 - LightGBM v1 Features (Testing)
+- **Status**: Training in progress
+- **Purpose**: Test if model architecture matters with same v1 features
+- **File**: `lgbm_v19_v1_features_*.csv`
+
+### INVALID MODELS (Critical Bugs - DO NOT USE)
+
+### v16 - Ensemble XGBoost + LightGBM ❌ CATASTROPHIC
+- **Holdout CV**: 0.1873
+- **Actual LB**: 3.353 (1690% worse!)
+- **Bugs**: LabelEncoder fit separately on train/test, oversimplified test features
+- **File**: `ensemble_v16_xgb_lgbm_01873.csv`
+
+### v17 - Fixed Advanced Features ❌ STILL BROKEN
+- **Holdout CV**: 0.4170
+- **Actual LB**: 0.729 (75% worse!)
+- **Bugs**: Test feature creation still fundamentally flawed
+- **File**: `xgb_v17_fixed_04170.csv`
+
+### v15 - Optuna Tuned Advanced Features ❌ BUGGY
+- **Holdout CV**: 0.3648
+- **Status**: Same bugs as v14/v16, not submitted
+- **File**: `xgb_v15_optuna_adv_03648.csv`
+
+### v14 - Advanced Features ❌ BUGGY
+- **Holdout CV**: 0.4640
+- **Status**: Critical bugs, not submitted
+- **File**: `xgb_v14_advanced_04640.csv`
 
 ## Autonomous Progress (May 9, 2026 - Evening)
 
