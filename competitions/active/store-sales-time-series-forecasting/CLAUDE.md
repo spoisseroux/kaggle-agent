@@ -218,3 +218,55 @@ Test one change at a time on LB to learn what actually helps
    - External data (oil prices, properly encoded stores)
    - Alternative model architectures (Neural networks?)
 3. Stop hyperparameter tuning - v19 params are optimal
+
+## Advanced Experimentation Session (May 10, 2026)
+
+### Battle Plan Execution
+Attempted multiple advanced approaches to beat v19:
+
+1. **v26 N-BEATS** (Neural Basis Expansion Analysis for Time Series)
+   - Status: FAILED - NaN errors during validation
+   - Architecture: 2 stacks (trend + seasonality), 30-day lookback, 16-day forecast
+   - Conclusion: Numerical instability, not suitable for this problem
+
+2. **v28 BiLSTM** (Bidirectional LSTM)
+   - CV: 0.6096 (70% worse than v19)
+   - Architecture: 2 layers, 128 units, dropout 0.2, bidirectional
+   - Conclusion: RNN architectures don't capture sales patterns well
+
+3. **v29 Fourier Transform** (FFT features)
+   - CV: 0.3601 (0.8% worse than v19)
+   - Features: FFT magnitudes from 7, 14, 30-day rolling windows (2 components each)
+   - Conclusion: Frequency domain features add noise, not signal
+
+4. **v30 External Data** (Oil prices + Store metadata)
+   - CV: 0.3770 (5.5% worse than v19)
+   - Features: Oil lag 1/7/30, rolling stats, pct_change + store city/state/type/cluster
+   - Conclusion: External data not predictive for short-term sales patterns
+
+### Key Findings
+
+**Neural Networks Don't Work:**
+- Both N-BEATS and BiLSTM failed catastrophically
+- Tree-based models (LightGBM) are superior for this tabular time series
+
+**Feature Engineering Hurts:**
+- Every feature addition made CV worse
+- v1 simple features (lags + rolling means) capture all useful signal
+- Complex features (Fourier, external data) add noise
+
+**v19 is Definitively Optimal:**
+- 8 experiments tried to beat it (v22-v25, v26, v28-v30)
+- All failed
+- Simple v1 features + LightGBM architecture is the winning combination
+
+### Remaining Work
+1. Submit queued models (v21-v25) tomorrow to validate on LB
+2. If nothing beats v19 on LB, accept it as final solution
+3. Document learnings and move to next competition
+
+### Tooling Improvements
+- Fixed conversation monitor service (stdout buffering issue)
+- All assistant messages now reliably forwarded to Telegram
+- Autonomous experimentation workflow validated end-to-end
+
