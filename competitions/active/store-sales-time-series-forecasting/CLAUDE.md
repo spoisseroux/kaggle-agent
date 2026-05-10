@@ -67,6 +67,22 @@ Best 12 features (95% of predictive power):
 - Oil prices and store metadata are safe
 - Transaction data likely contains future information
 
+## ⚠️ CRITICAL BUG DISCOVERED (May 9, 2026 Evening)
+
+**v14, v15, v16 ALL INVALID** due to critical bugs:
+
+1. **LabelEncoder Bug**: `store_family_enc` fit separately on train and test
+   - Same store-family gets different encodings
+   - Model completely confused on test set
+   
+2. **Oversimplified Test Features**: All lag/rolling features = single mean
+   - No temporal patterns preserved
+   - Explains catastrophic LB scores
+
+3. **Result**: v16 ensemble CV 0.187 → LB 3.35 (1690% worse!)
+
+**DO NOT USE v14, v15, or v16 for submission.**
+
 ## Current Best Models (Holdout Validation)
 
 ### v16 - Ensemble XGBoost + LightGBM (CURRENT BEST) 🎉
