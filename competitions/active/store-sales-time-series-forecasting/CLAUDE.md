@@ -270,3 +270,98 @@ Attempted multiple advanced approaches to beat v19:
 - All assistant messages now reliably forwarded to Telegram
 - Autonomous experimentation workflow validated end-to-end
 
+
+## Major Research Breakthrough (May 10, 2026 - Evening)
+
+### Question: How do top scorers (0.376-0.379) beat my 0.498?
+
+**Investigation Process:**
+1. Downloaded top public notebooks (2895 votes comprehensive guide)
+2. Analyzed leaderboard leaders' techniques
+3. Found critical insight: **Recursive Forecasting**
+
+### The Discovery
+
+**v19's Test Set Handling (LB 0.498):**
+For ALL lag and rolling features, fills with single constant (30-day mean):
+```python
+df["Lag_3"] = df["lag_mean"].fillna(0)  # Same value!
+df["Lag_7"] = df["lag_mean"].fillna(0)  # Same value!
+df[f"Roll_mean_{window}"] = df["lag_mean"].fillna(0)  # Same value!
+```
+
+Result: Only day_of_week, is_weekend, is_holiday, onpromotion actually vary in test set!
+
+**Top Scorers' Approach: Recursive Forecasting**
+Instead of predicting all 16 test days at once, predict day-by-day:
+1. **Day 1**: Predict using real lag 1-7 from training
+2. **Day 2**: Predict using lag 1 from Day 1 prediction + real lag 2-7 from training
+3. **Day 3**: Predict using lag 1-2 from predictions + real lag 3-7 from training
+4. Continue for all 16 days
+
+**Why This Works:**
+- Short lags (1-7 days) have high predictive power
+- Each prediction builds real lag features for next day
+- Errors accumulate but much better than constant mean
+- Enables use of powerful recent patterns
+
+### v32 Implementation
+
+**Model:** LightGBM with v1 features (same as v19)  
+**CV:** 0.3572 (same as v19 - validation uses batch)  
+**Test Prediction:** Recursive (36 seconds for 16 days)  
+**Expected LB:** 0.37-0.38 (top leaderboard range)
+
+**Key Code:**
+```python
+def recursive_forecast(model, train_df, test_df, holidays, feature_cols):
+    forecast_df = train_df.copy()
+    
+    for forecast_date in test_dates:
+        # Combine history + current day
+        combined = pd.concat([forecast_df, current_day])
+        
+        # Create features (lags from real data + predictions)
+        combined = create_features(combined)
+        
+        # Predict
+        predictions = model.predict(X_forecast)
+        
+        # Add to history for next day
+        forecast_df = pd.concat([forecast_df, predictions])
+```
+
+### Hypothesis vs Reality
+
+**Initial Hypothesis (WRONG):**
+- Test is 16 days after training ends
+- Lag 3/7 are NaN in test
+- Need lag 16+ to be valid
+
+**Actual Reality:**
+- Test is 1 day after training (Aug 16 vs Aug 15)
+- Test period is 16 days LONG (Aug 16-31)
+- v19 fills lags with constant, not NaN
+- Top scorers use recursive forecasting with short lags
+
+### Impact
+
+This explains the entire 24% gap:
+- **v19 LB 0.498**: Crude approximation (all lags = same constant)
+- **Top LB 0.376**: Sophisticated recursive with real lag features
+- **v32 Expected**: Bridge the gap with proper technique
+
+### Sources
+
+- [Recursive MultiStep Time Series Forecasting](https://www.kaggle.com/code/ahmedabdulhamid/recursive-multistep-time-series-forecasting)
+- [Store Sales Comprehensive Guide](https://www.kaggle.com/code/ekrembayar/store-sales-ts-forecasting-a-comprehensive-guide)
+- Top leaderboard analysis (0.376-0.379 range)
+
+### Next Steps
+
+1. Submit v32 when daily limit resets (8:00 PM EDT / midnight UTC)
+2. If LB confirms 0.37-0.38, recursive forecasting is validated
+3. If not, investigate other top scorer techniques (ensembling, feature engineering on recursive predictions)
+
+**Status:** v32 ready, awaiting submission slot
+
