@@ -20,6 +20,10 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import subprocess
 
+# Force unbuffered output for systemd
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # Find the active conversation transcript
 CLAUDE_DIR = Path.home() / ".claude" / "projects" / "-home-keehar-kaggle-agent"
 
@@ -105,7 +109,7 @@ def monitor_bash_outputs():
     return []
 
 def main():
-    print("🔍 Conversation Monitor starting...")
+    print("🔍 Conversation Monitor starting...", flush=True)
 
     recent_notifies = []  # Track recent notify.py calls to avoid duplicates
     last_cleanup = datetime.now()
@@ -114,17 +118,17 @@ def main():
         try:
             conv_file = find_active_conversation()
             if not conv_file:
-                print("⚠️  No active conversation found, waiting...")
+                print("⚠️  No active conversation found, waiting...", flush=True)
                 time.sleep(10)
                 continue
 
-            print(f"📝 Monitoring: {conv_file.name}")
+            print(f"📝 Monitoring: {conv_file.name}", flush=True)
 
             for msg in tail_conversation(conv_file):
                 # Check if conversation file changed (new session)
                 current_active = find_active_conversation()
                 if current_active != conv_file:
-                    print(f"🔄 Conversation switched to: {current_active.name}")
+                    print(f"🔄 Conversation switched to: {current_active.name}", flush=True)
                     break
 
                 # Process assistant messages
@@ -132,7 +136,7 @@ def main():
                     text = extract_text_content(msg)
 
                     if should_forward(text, recent_notifies):
-                        print(f"📤 Auto-forwarding to Telegram ({len(text)} chars)")
+                        print(f"📤 Auto-forwarding to Telegram ({len(text)} chars)", flush=True)
                         send_to_telegram(text)
 
                         # Track this message to avoid re-sending
@@ -144,10 +148,10 @@ def main():
                     last_cleanup = datetime.now()
 
         except KeyboardInterrupt:
-            print("\n👋 Monitor stopped")
+            print("\n👋 Monitor stopped", flush=True)
             break
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error: {e}", flush=True)
             time.sleep(5)  # Wait before retry
 
 if __name__ == "__main__":
