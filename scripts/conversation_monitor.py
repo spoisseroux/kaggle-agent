@@ -69,17 +69,12 @@ def extract_text_content(msg):
 
 def should_forward(text, recent_notifies):
     """Check if message should be forwarded to Telegram."""
-    if not text or len(text) < 20:
-        # Skip very short messages (likely just acknowledgments)
+    # ALWAYS forward - user needs 100% reliability
+    # Better to have duplicates than miss messages
+    if not text or len(text) < 10:
         return False
 
-    # Check if this exact text was recently sent via notify.py
-    # (We track recent notify calls to avoid duplicates)
-    for notify_text in recent_notifies:
-        if notify_text in text or text in notify_text:
-            return False
-
-    return True
+    return True  # Send everything, no filtering
 
 def send_to_telegram(text, max_length=3800):
     """Send message to Telegram via notify.py."""
