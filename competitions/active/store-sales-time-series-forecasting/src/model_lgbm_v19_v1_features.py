@@ -13,12 +13,17 @@ Features (12 total - PROVEN):
 - Temporal: day_of_week, is_weekend, is_holiday
 - Promotion: onpromotion
 """
+import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import mean_squared_log_error
 import lightgbm as lgb
 import mlflow
+
+# Add parent directory to path for core imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from core.langfuse_logger import log_kaggle_model
 
 DATA_DIR = Path("data/store-sales-time-series-forecasting")
 SUBMISSION_DIR = Path("competitions/active/store-sales-time-series-forecasting/submissions")
@@ -209,6 +214,18 @@ def main():
         mlflow.log_metric("vs_xgb_v1", holdout_cv - 0.4842)
         mlflow.log_metric("vs_xgb_v18", holdout_cv - 0.4872)
         mlflow.log_artifact(str(submission_path))
+
+    # Log to Langfuse
+    log_kaggle_model(
+        name="v19",
+        competition="store-sales-time-series-forecasting",
+        model_type="LightGBM",
+        cv_score=holdout_cv,
+        lb_score=0.4983,  # Actual LB score from submission
+        features=len(feature_cols),
+        hyperparameters=params,
+        status="BEST"
+    )
 
     print()
     print("="*70)

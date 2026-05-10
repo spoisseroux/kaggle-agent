@@ -12,12 +12,17 @@ vs v20 Optuna (which overfit):
 
 Features: Same v1 proven features (12 total)
 """
+import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import mean_squared_log_error
 import lightgbm as lgb
 import mlflow
+
+# Add parent directory to path for core imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from core.langfuse_logger import log_kaggle_model
 
 DATA_DIR = Path("data/store-sales-time-series-forecasting")
 SUBMISSION_DIR = Path("competitions/active/store-sales-time-series-forecasting/submissions")
@@ -207,6 +212,18 @@ def main():
         mlflow.log_metric("holdout_cv", holdout_cv)
         mlflow.log_metric("vs_v19", holdout_cv - 0.3572)
         mlflow.log_artifact(str(submission_path))
+
+    # Log to Langfuse
+    log_kaggle_model(
+        name="v25",
+        competition="store-sales-time-series-forecasting",
+        model_type="LightGBM",
+        cv_score=holdout_cv,
+        lb_score=None,  # Not yet submitted
+        features=len(feature_cols),
+        hyperparameters=params,
+        status="deeper_worse"
+    )
 
     print()
     print("="*70)

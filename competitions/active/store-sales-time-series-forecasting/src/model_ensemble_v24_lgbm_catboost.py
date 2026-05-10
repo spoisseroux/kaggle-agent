@@ -13,6 +13,7 @@ WARNING: v16 ensemble failed catastrophically. This is simpler:
 - No advanced features
 - Proper validation
 """
+import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -20,6 +21,10 @@ from sklearn.metrics import mean_squared_log_error
 import lightgbm as lgb
 from catboost import CatBoostRegressor
 import mlflow
+
+# Add parent directory to path for core imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from core.langfuse_logger import log_kaggle_model
 
 DATA_DIR = Path("data/store-sales-time-series-forecasting")
 SUBMISSION_DIR = Path("competitions/active/store-sales-time-series-forecasting/submissions")
@@ -248,6 +253,18 @@ def main():
         mlflow.log_metric("cat_cv", cat_score)
         mlflow.log_metric("improvement", lgb_score - best_score)
         mlflow.log_artifact(str(submission_path))
+
+    # Log to Langfuse
+    log_kaggle_model(
+        name="v24-ensemble",
+        competition="store-sales-time-series-forecasting",
+        model_type="LightGBM+CatBoost",
+        cv_score=best_score,
+        lb_score=None,  # Not yet submitted
+        features=len(feature_cols),
+        hyperparameters={"lgb_weight": best_weight, "cat_weight": 1 - best_weight},
+        status="ensemble_no_improvement"
+    )
 
     print()
     print("="*70)
