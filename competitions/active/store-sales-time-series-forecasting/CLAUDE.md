@@ -171,8 +171,50 @@ v20 showed better CV but worse LB - overfitting to validation set
 ### 4. Incremental Validation Works
 Test one change at a time on LB to learn what actually helps
 
-## Next Steps
-1. Add ONE feature at a time to v19 (build incrementally)
-2. Try CatBoost with v1 features (test another architecture)
-3. Feature engineering with proper test set handling
-4. Stop aggressive hyperparameter tuning
+## Comprehensive Autonomous Session Results (v18-v25)
+
+### All Experiments
+1. **v18** XGBoost+Optuna: CV 0.487 → LB 0.533 ❌ No improvement
+2. **v19** LightGBM: CV 0.357 → LB 0.498 ⭐ BEST!
+3. **v20** LightGBM+Optuna: CV 0.352 → LB 0.512 ❌ Overfit
+4. **v21** CatBoost: CV 0.446 ✅ Middle ranking
+5. **v22** LightGBM+month: CV 0.358 ❌ No help
+6. **v23** LightGBM+day_of_month: CV 0.377 ❌ Hurts (despite rank 1 importance!)
+7. **v24** Ensemble (LightGBM+CatBoost): CV 0.357 ✅ Optimal weights: 100% LightGBM
+8. **v25** LightGBM depth=8: CV 0.366 ❌ Worse than v19
+
+### Final Validated Insights
+
+**Model Architecture Ranking:**
+1. LightGBM (v19): LB 0.498 ⭐
+2. CatBoost (v21): Expected ~0.51
+3. XGBoost (v1): LB 0.529
+
+**What Makes v19 Optimal:**
+- Simple v1 feature set (12 features)
+- LightGBM architecture
+- Conservative hyperparameters (depth=6, lr=0.05)
+- No extra temporal features
+- No aggressive tuning
+
+**Why Everything Else Failed:**
+- Optuna: Overfits to validation (v20)
+- Temporal features: Add noise (v22, v23)
+- Ensembling: No complementary value (v24)
+- Deeper trees: Overfits (v25)
+- XGBoost: Wrong model architecture (v18)
+
+### Tomorrow's Queue (5 submissions available)
+1. v21 CatBoost (CV 0.446)
+2. v22 month feature (CV 0.358)
+3. v23 day_of_month (CV 0.377)
+4. v24 ensemble (CV 0.357)
+5. v25 deeper (CV 0.366)
+
+### Next Steps
+1. Submit queued models to validate on LB
+2. If v19 remains best, focus on:
+   - Different feature types (not temporal)
+   - External data (oil prices, properly encoded stores)
+   - Alternative model architectures (Neural networks?)
+3. Stop hyperparameter tuning - v19 params are optimal
