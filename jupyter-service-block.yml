@@ -1,0 +1,58 @@
+# COPY THIS ENTIRE BLOCK
+# Paste it in Portainer Stack Editor after the langfuse-worker service
+
+  jupyterlab:
+    image: jupyter/tensorflow-notebook:latest
+    container_name: kaggle-jupyterlab
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      GRANT_SUDO: "yes"
+      POSTGRES_DSN: postgresql://claude:${POSTGRES_PASSWORD}@postgres:5432/claude_memory
+      QDRANT_URL: http://qdrant:6333
+      MLFLOW_TRACKING_URI: http://host.docker.internal:5000
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME}
+      KAGGLE_KEY: ${KAGGLE_KEY}
+      NB_UID: 1000
+      NB_GID: 1000
+      CHOWN_HOME: "yes"
+    volumes:
+      - /home/keehar/kaggle-agent:/home/jovyan/work
+      - model_cache:/models
+      - jupyter_config:/home/jovyan/.jupyter
+      - jupyter_conda:/opt/conda
+    ports:
+      - "8888:8888"
+    user: root
+    working_dir: /home/jovyan/work
+    command: >
+      bash -c "
+      echo 'Installing Kaggle ML packages...' &&
+      pip install --quiet --no-cache-dir \
+        lightgbm xgboost catboost \
+        optuna mlflow langfuse \
+        kaggle plotly seaborn scikit-learn \
+        psycopg2-binary qdrant-client tqdm &&
+      echo 'Setting permissions...' &&
+      chown -R 1000:1000 /home/jovyan &&
+      echo 'Starting JupyterLab...' &&
+      start-notebook.sh \
+        --ServerApp.token='${JUPYTER_TOKEN}' \
+        --ServerApp.password='' \
+        --ServerApp.allow_origin='*' \
+        --ServerApp.ip='0.0.0.0'
+      "
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - qdrant
+
+# ALSO ADD THESE TWO LINES TO THE volumes: SECTION AT THE BOTTOM:
+#   jupyter_config:
+#   jupyter_conda:
