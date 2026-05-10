@@ -84,7 +84,7 @@ services:
       - postgres
 
   jupyterlab:
-    image: jupyter/tensorflow-notebook:latest
+    image: quay.io/jupyter/tensorflow-notebook:latest
     container_name: kaggle-jupyterlab
     environment:
       JUPYTER_ENABLE_LAB: "yes"
