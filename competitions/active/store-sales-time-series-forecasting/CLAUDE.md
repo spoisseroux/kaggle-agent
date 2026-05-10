@@ -133,22 +133,46 @@ Best 12 features (95% of predictive power):
 
 ## Autonomous Progress (May 9, 2026 - Evening)
 
-### Phase 1: Validation Strategy Validation ✅
+### Session 1: Bug Fixes and Validation ✅
+- Fixed Telegram integration (142 stuck messages)
 - Submitted v1_baseline to Kaggle
 - Confirmed: Holdout CV 0.48 → LB 0.53 (9.3% gap)
-- Much better than TimeSeriesSplit (163% gap!)
+- Discovered v14-v17 all had critical bugs
 
-### Phase 2: Feature Engineering ✅
-- Researched Kaggle best practices
-- Built v14 with advanced features
-- Achieved 4.2% improvement
+### Session 2: Hyperparameter Exploration ✅
+- v18: XGBoost + Optuna → CV 0.487, LB 0.533
+- Result: No improvement, v1 hyperparameters already optimal
+- Learning: Hyperparameter tuning not the path forward
 
-### Phase 3: Hyperparameter Optimization (In Progress)
-- v15 using Optuna on v14 features
-- 30 trials, targeting <0.464 CV
+### Session 3: Model Architecture Breakthrough ✅
+- v19: LightGBM + v1 features → CV 0.357, LB 0.498 ⭐ BEST!
+- Improvement: 5.9% better on LB vs XGBoost
+- Discovery: Model architecture matters more than hyperparameters
+- Note: LightGBM has 39.5% CV-LB gap (vs XGBoost's 9.3%)
+
+### Session 4: Overfitting Discovery ✅
+- v20: LightGBM + Optuna → CV 0.352, LB 0.512 ❌
+- Result: Better CV but WORSE LB (overfitting to validation)
+- Learning: Aggressive optimization hurts generalization
+- Conclusion: v19 simple hyperparameters beat over-optimized ones
+
+## Key Learnings from Autonomous Work
+
+### 1. Model Selection > Hyperparameters
+LightGBM with simple params (v19) beats XGBoost with any tuning
+
+### 2. Validation Gaps Are Model-Specific
+- XGBoost: 9.3% gap (reliable)
+- LightGBM: 39.5% gap (needs calibration)
+
+### 3. Optuna Can Overfit
+v20 showed better CV but worse LB - overfitting to validation set
+
+### 4. Incremental Validation Works
+Test one change at a time on LB to learn what actually helps
 
 ## Next Steps
-1. Complete v15 Optuna tuning
-2. Try ensemble (XGBoost + LightGBM stacking)
-3. Submit v14 to validate expected LB ~0.50
-4. Feature selection to remove noise
+1. Add ONE feature at a time to v19 (build incrementally)
+2. Try CatBoost with v1 features (test another architecture)
+3. Feature engineering with proper test set handling
+4. Stop aggressive hyperparameter tuning
