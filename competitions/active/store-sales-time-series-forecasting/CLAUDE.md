@@ -365,3 +365,66 @@ This explains the entire 24% gap:
 
 **Status:** v32 ready, awaiting submission slot
 
+## v32 Submission Results (May 10, 2026 - Evening)
+
+### Outcome: CATASTROPHIC FAILURE ❌
+
+**Expectations vs Reality:**
+- Expected LB: 0.37-0.38 (based on top scorer analysis)
+- Actual LB: 0.5936 (19% WORSE than v19!)
+- v19 LB: 0.4983 (baseline)
+
+**Analysis:**
+- v32 predictions have ZERO correlation with v19 (-0.0246)
+- Not just error accumulation - fundamental implementation bug
+- Recursive forecasting concept is sound, but implementation is broken
+
+**Root Cause (Suspected):**
+- Line 138: Fills NaN lag features with 0 instead of proper fallback
+- Line 146: Potential index alignment issues in concat
+- Feature engineering in recursive loop may be creating invalid features
+
+**Lesson:** Recursive forecasting requires extremely careful implementation. The day-by-day loop is fragile and errors cascade quickly.
+
+**Status:** v32 FAILED, not recommended for further use
+
+## v33 Hierarchical Models (May 10, 2026 - Evening)
+
+### Alternative Approach After v32 Failure
+
+**Strategy:** Train separate LightGBM model for each of 33 product families
+
+**Rationale:**
+- Different families have different seasonality (AUTOMOTIVE ≠ GROCERY)
+- Research shows top scorers use per-family or hierarchical models
+- v19 uses single global model that averages across all patterns
+
+**Results:**
+- **CV: 0.3550** (0.62% better than v19's 0.3572)
+- **File:** lgbm_v33_hierarchical_03550.csv
+- **LB:** Pending submission approval
+
+**Per-Family CV Variance:**
+- Best: BOOKS (0.0885)
+- Worst: LINGERIE (0.6078)
+- Range: 6.9x difference shows importance of family-specific models
+
+**Implementation:**
+- 33 separate LightGBM models (one per family)
+- Same v1 features for each model
+- Same hyperparameters as v19 (depth=6, lr=0.05)
+- Batch test prediction (not recursive)
+
+**Expected LB Impact:** 3-5% improvement over v19 → ~0.47
+
+**Status:** Awaiting user approval for submission
+
+## Next Research Directions
+
+Based on research agent findings, if v33 doesn't bridge gap to 0.37-0.38:
+
+1. **Debug v32 recursive** - Fix implementation bug, concept is sound
+2. **Smart ensemble** - Time-varying weights (LightGBM days 1-8, XGBoost days 9-16)
+3. **Target encoding** - Store-family historical means (time-aware to prevent leakage)
+4. **Outlier clipping** - Per-family 1st-99th percentile clipping (RMSLE sensitive to extremes)
+
