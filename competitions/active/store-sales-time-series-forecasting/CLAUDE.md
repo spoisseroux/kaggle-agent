@@ -417,14 +417,71 @@ This explains the entire 24% gap:
 
 **Expected LB Impact:** 3-5% improvement over v19 → ~0.47
 
-**Status:** Awaiting user approval for submission
+**Status:** Submitted and FAILED
 
-## Next Research Directions
+## v33 Submission Results (May 10/11, 2026)
 
-Based on research agent findings, if v33 doesn't bridge gap to 0.37-0.38:
+### Outcome: CATASTROPHIC FAILURE ❌ (SAME AS v32!)
 
-1. **Debug v32 recursive** - Fix implementation bug, concept is sound
-2. **Smart ensemble** - Time-varying weights (LightGBM days 1-8, XGBoost days 9-16)
-3. **Target encoding** - Store-family historical means (time-aware to prevent leakage)
-4. **Outlier clipping** - Per-family 1st-99th percentile clipping (RMSLE sensitive to extremes)
+**Expectations vs Reality:**
+- Expected LB: ~0.47 (3-5% improvement over v19)
+- Actual LB: 0.5902 (18.5% WORSE than v19!)
+- v19 LB: 0.4983 (baseline)
+
+**Critical Finding:**
+v33 predictions have NEGATIVE correlation with v19: **-0.0327**
+(v32 had -0.0246)
+
+This indicates **systematic bug** affecting both v32 and v33, not random error.
+
+**What Makes This Mysterious:**
+1. v33 used CORRECT feature creation (v19 approach with store-family means)
+2. v32 and v33 use completely different approaches (recursive vs hierarchical)
+3. Both fail with nearly identical LB scores (~0.59)
+4. Both have negative correlation with working v19
+
+**Comparison:**
+- v19 mean predictions: 460.89
+- v33 mean predictions: 368.07 (20% lower)
+- v33 generally predicts LOWER than v19 across the board
+
+**Hypothesis:**
+There's a common bug in v32/v33 that:
+- Reverses or inverts predictions somehow
+- Occurs in training pipeline, not test feature creation
+- Doesn't show up in CV but breaks LB predictions
+- Not related to fillna approach (v33 used correct approach)
+
+**Status:** v33 FAILED, systematic bug unidentified
+
+## v34 Prepared (Recursive Forecasting - Fixed)
+
+Created v34 with fix for v32's fillna(0) bug:
+- Fills NaN lag features with store-family mean (like v19)
+- Only date features use fillna(0)
+- Expected to prevent v32's death spiral
+
+**File:** model_lgbm_v34_recursive_fixed.py
+**Status:** Ready to run, BUT likely will also fail if bug is elsewhere
+
+## Critical Analysis Needed
+
+**Pattern:**
+- v19 (simple global model): LB 0.498 ✅
+- v32 (recursive): LB 0.594 ❌
+- v33 (hierarchical): LB 0.590 ❌
+- Correlation v19-v32: -0.0246
+- Correlation v19-v33: -0.0327
+
+**Next Steps:**
+1. **Line-by-line audit** - Compare v19 vs v33 training pipeline
+2. **Check for:**
+   - Data leakage in opposite direction
+   - Reversed target variable
+   - Train/test split issues
+   - Feature preprocessing that inverts signal
+3. **Test v34** - May also fail if bug is in common code
+4. **Consider** - Return to v19 baseline, try simpler improvements first
+
+**Current Best:** v19 at LB 0.498
 
