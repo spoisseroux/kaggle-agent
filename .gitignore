@@ -48,3 +48,4 @@ test_*.py
 output.md
 catboost_info/
 plots/
+.jupyter-access
