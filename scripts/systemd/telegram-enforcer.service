@@ -1,0 +1,17 @@
+[Unit]
+Description=Telegram Delivery Enforcer - ensures all Claude responses go to Telegram
+After=network.target
+
+[Service]
+Type=simple
+User=keehar
+WorkingDirectory=/home/keehar/kaggle-agent
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 /home/keehar/kaggle-agent/scripts/telegram_enforcer.py --watch
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
