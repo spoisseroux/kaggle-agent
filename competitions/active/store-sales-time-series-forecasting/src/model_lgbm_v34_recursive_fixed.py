@@ -135,14 +135,15 @@ def recursive_forecast(model, train_df, test_df, holidays, feature_cols):
         current_features = combined[combined['date'] == forecast_date].copy()
 
         # FIX v32 BUG: Fill NaN with store-family mean, not 0
-        # Map store-family means to current rows
-        sf_means = current_features.set_index(["store_nbr", "family"]).index.map(store_family_means)
+        # Create a series of means indexed by the current features' index
+        sf_means_series = current_features.set_index(["store_nbr", "family"]).index.to_series().map(store_family_means)
+        sf_means_series.index = current_features.index
 
         # Fill NaN lag/rolling features with reasonable approximation
         X_forecast = current_features[feature_cols].copy()
         for col in feature_cols:
             if 'Lag' in col or 'Roll' in col:
-                X_forecast[col] = X_forecast[col].fillna(sf_means)
+                X_forecast[col] = X_forecast[col].fillna(sf_means_series)
         X_forecast = X_forecast.fillna(0)  # Fill remaining NaN (date features) with 0
 
         # Predict
