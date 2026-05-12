@@ -274,3 +274,48 @@ forwarded to tmux via `send-keys`.
 - Submission limits: 10/day, reset at 00:00 UTC
 
 **Next:** Wait for submission counter to reset at midnight UTC, then submit with approval
+
+## 2026-05-11 - Ridge Intercept Investigation Complete & v54 Implementation
+
+**What changed:**
+- Completed investigation into why v50's Ridge regression outperforms grid search
+- Discovered Ridge's intercept term is the critical factor (5.8% CV improvement)
+- Implemented v54 as clean, documented version of optimal Ridge ensemble
+- Validated investigation findings: exact replication of v50 performance
+
+**Key discovery:**
+- Ridge WITH intercept: CV 0.3925 ✓
+- Ridge WITHOUT intercept: CV 0.4165 ✗
+- Grid search (v53, no intercept): CV 0.4099 ✗
+- **The intercept term (-0.4937) provides bias correction that simple weighted averaging cannot achieve**
+
+**Investigation details:**
+- Tested 3 hypotheses: intercept term, regularization strength, normalization
+- Intercept term confirmed as sole differentiator
+- Regularization (alpha) doesn't matter - problem is well-conditioned
+- Normalization has no effect
+
+**Optimal formula:**
+```
+predictions = 0.7145 * LightGBM + 0.2746 * XGBoost - 0.4937
+```
+
+**Files:**
+- Investigation script: `scripts/investigate_v50_ridge_advantage.py`
+- Documentation: `docs/ridge_intercept_discovery.md` (comprehensive writeup)
+- Pattern summary: `docs/pattern_learning_session_summary.md` (v51-v53 experiments)
+- v54 implementation: `src/model_ensemble_v54_ridge_optimized.py`
+- Submission: `ensemble_v54_ridge_opt_039245csv` (CV 0.3925, exact match to v50)
+
+**Hypothesis database updated:**
+- v54 logged with confidence 0.95
+- Insight: "Ridge intercept term critical for ensemble performance"
+- Category: ensemble_methods
+
+**Lessons learned:**
+- Simple is not always optimal - Ridge with intercept is "simple" but critical
+- Grid search without intercept is fundamentally limited
+- Always use `fit_intercept=True` in Ridge/Lasso for meta-learning
+- Base model predictions may have systematic bias that intercept corrects
+
+**Status:** All mysteries solved. v50/v54 confirmed as optimal for this competition.

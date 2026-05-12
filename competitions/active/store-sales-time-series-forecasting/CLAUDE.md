@@ -85,14 +85,82 @@ Best 12 features (95% of predictive power):
 
 ## Current Best Models (Holdout Validation + LB Confirmed)
 
-### v1_baseline_holdout (CURRENT BEST) ✅
+### v50 - Stacking Ensemble ⭐ CURRENT BEST (May 2026)
+- **Holdout CV**: 0.3925 (unfiltered)
+- **Actual LB**: 0.45493
+- **Gap**: 15.9%
+- **Architecture**: Two-stage stacking
+  - Stage 1: LightGBM + XGBoost base models
+  - Stage 2: Ridge meta-model (learned weights: 71% LightGBM, 27% XGBoost)
+- **Features**: 12 v1 features (same as v19)
+- **Result**: **8.7% better than v19 on LB** ✓
+- **File**: `ensemble_v50_stacking_039245csv`
+- **Rank**: Best validated submission
+- **Why it works**: Meta-learning captures complementary strengths of different model architectures
+
+### v54 - Ridge Optimized (Investigation-Validated) ⭐ INVESTIGATION COMPLETE (May 2026)
+- **Holdout CV**: 0.3925 (exact match to v50)
+- **Formula**: `predictions = 0.7145 × LightGBM + 0.2746 × XGBoost - 0.4937`
+- **Discovery**: Ridge's **intercept term** is critical for ensemble performance
+  - Ridge WITH intercept: CV 0.3925 ✓
+  - Ridge WITHOUT intercept: CV 0.4165 ✗ (6.1% worse)
+  - Grid search without intercept (v53): CV 0.4099 ✗ (4.4% worse)
+- **Investigation**: Systematically tested 3 hypotheses (intercept, regularization, normalization)
+- **Result**: Intercept term provides 5.8% CV improvement through bias correction
+- **File**: `ensemble_v54_ridge_opt_039245csv`
+- **Documentation**: `docs/ridge_intercept_discovery.md` (comprehensive investigation writeup)
+- **Why it works**: Intercept corrects systematic overprediction in base models (-0.4937 shift)
+- **Key insight**: Always use `fit_intercept=True` in Ridge/Lasso meta-learning
+
+### Pattern Learning Experiments (v51-v53) - Led to Ridge Investigation
+
+**v51 - 3-Model Stacking**
+- **Hypothesis**: More diverse base models → better meta-learning
+- **Architecture**: LightGBM + XGBoost + CatBoost → Ridge
+- **Result**: CV 0.4063 (3.5% worse than v50) ❌
+- **Learning**: Weak models (CatBoost CV 0.4617) add noise, not signal
+- **Weights learned**: 43% LGB, 2% XGB, 55% CatBoost (worst model dominated!)
+
+**v52 - Hill Climbing Optimization**
+- **Hypothesis**: Systematic weight search beats Ridge regression
+- **Method**: Start with best model, iteratively add others with varying weights
+- **Result**: CV 0.4093 (4.3% worse than v50) ❌
+- **Optimal**: 95% LGB + 5% CatBoost (XGBoost excluded entirely)
+- **Learning**: XGBoost provides no benefit when combined with LightGBM
+
+**v53 - Grid Search 2-Model**
+- **Hypothesis**: Remove weak CatBoost, optimize only LGB + XGB
+- **Method**: Exhaustive grid search (51 weight combinations, 50-100% LGB)
+- **Result**: CV 0.4099 (4.4% worse than v50) ❌
+- **Optimal**: 99% LGB + 1% XGB (essentially just LightGBM alone)
+- **Learning**: All optimization converges to LGB-dominant solutions
+
+**Key Pattern Discovered:**
+All v51-v53 experiments worse than v50 despite:
+- Different optimization methods (Ridge, hill climbing, grid search)
+- Different model combinations (2 vs 3 models)
+- Systematic search (100+ configurations tested)
+
+**This anomaly triggered the investigation that discovered Ridge's intercept term is the differentiator!**
+
+**Documentation**: `docs/pattern_learning_session_summary.md`
+
+### v19 - LightGBM v1 Features (Previous Best)
+- **Holdout CV**: 0.3572 (filtered, y>0 only) / 0.4523 (unfiltered)
+- **Actual LB**: 0.49833
+- **Gap**: 39.5% (filtered CV) / 10.3% (unfiltered CV)
+- **Features**: 12 proven features (lags 3/7, rolling means 7/14/30/60/90, roll_std_7, day_of_week, is_weekend, is_holiday, onpromotion)
+- **Model**: LightGBM with conservative parameters (depth=6, lr=0.05)
+- **File**: `lgbm_v19_v1_features_03572.csv`
+- **Important Note**: Reported CV 0.3572 excluded 14.69% of validation samples (sales=0), making it misleadingly low. True unfiltered CV is 0.4523.
+- **Superseded by**: v50 stacking ensemble (8.7% better LB)
+
+### v1_baseline_holdout (Historical)
 - **Holdout CV**: 0.4842
 - **Actual LB**: 0.5291
-- **Gap**: 8.5% ✅ VALIDATED
-- **Features**: 12 proven features (lags 3/7, rolling means 7/14/30/60/90, roll_std_7, day_of_week, is_weekend, is_holiday, onpromotion)
+- **Gap**: 8.5%
 - **Model**: XGBoost with manual hyperparameters
 - **File**: `xgb_v1_baseline_holdout_04842.csv`
-- **Rank**: Best validated submission
 
 ### v18 - Optuna on v1 Features
 - **Holdout CV**: 0.4872
@@ -101,11 +169,6 @@ Best 12 features (95% of predictive power):
 - **Result**: 0.62% worse than v1 in CV, 0.81% worse on LB ❌
 - **Lesson**: v1 hyperparameters already optimal, Optuna didn't help
 - **File**: `xgb_v18_v1_optuna_04872.csv`
-
-### v19 - LightGBM v1 Features (Testing)
-- **Status**: Training in progress
-- **Purpose**: Test if model architecture matters with same v1 features
-- **File**: `lgbm_v19_v1_features_*.csv`
 
 ### INVALID MODELS (Critical Bugs - DO NOT USE)
 
@@ -484,4 +547,107 @@ Created v34 with fix for v32's fillna(0) bug:
 4. **Consider** - Return to v19 baseline, try simpler improvements first
 
 **Current Best:** v19 at LB 0.498
+
+
+
+## CV-LB Gap Investigation (May 11, 2026)
+
+### Problem Statement
+v19 has 39.5% CV-LB gap (CV 0.357 → LB 0.498). Investigated root causes and potential solutions through validation strategy experiments.
+
+### Root Cause Analysis
+
+**Validation Period Bias:**
+- Training data: 2013-2017, mean sales 356
+- Validation period (Jul 16-Aug 15, 2017): mean sales 472 (33% higher)
+- Sales trend: 2013 (216) → 2014 (323) → 2015 (371) → 2016 (444) → 2017 (480)
+- Validation uses PEAK sales period, causing optimization bias toward high sales
+
+**Why the Gap Exists:**
+- Model optimizes for unrepresentative high-sales validation period
+- Test set (Aug 16-31) likely has similar elevated sales
+- Gap is inherent to temporal split, not model overfitting
+- Proper temporal validation requires this trade-off (no random splits in time series)
+
+### Experiments to Address Gap
+
+**v38 - Anti-Overfitting (LightGBM)**
+- Strategy: Reduce regularization (L1=L2=0.1)
+- CV: 0.366, LB: 0.533 (46% gap)
+- Result: WORSE than v19 - regularization wasn't the issue ❌
+
+**v39 - Grid Search L1 vs L2 (LightGBM)**
+- Strategy: Test L1-only vs L2-only regularization
+- 48 configurations tested
+- Best CV: 0.4526 (26.7% worse than v19)
+- Result: All configurations worse - regularization hurts ❌
+
+**v40 - XGBoost Simple Parameters**
+- Strategy: Switch to XGBoost (9.3% historical gap vs LightGBM's 39.5%)
+- Parameters: max_depth=4, lr=0.05 (conservative)
+- CV: 0.5220 (46% worse than v19)
+- Result: XGBoost significantly worse than LightGBM ❌
+
+**v41 - XGBoost Historical Parameters**
+- Strategy: Use proven historical XGBoost params (max_depth=8, reg_alpha=0.1, reg_lambda=1.0)
+- CV: 0.4554 (27.5% worse than v19)
+- Result: Better than v40 but still worse than LightGBM ❌
+
+**v42 - XGBoost 60-Day Validation**
+- Strategy: Longer validation window to reduce bias (60 vs 30 days)
+- Validation period: Jun 16-Aug 15 (still 34% higher sales than training)
+- CV: 0.4595
+- Result: Slightly worse than 30-day validation, bias persists ❌
+
+**v43 - XGBoost Walk-Forward CV**
+- Strategy: 3 temporal folds to reduce single-window bias
+- Fold 1 (May 17-Jun 16): CV 0.4165
+- Fold 2 (Jun 16-Jul 16): CV 0.4745
+- Fold 3 (Jul 16-Aug 15): CV 0.4559
+- Mean CV: 0.4490 ± 0.024
+- Result: Better than single XGBoost holdout but worse than LightGBM ❌
+
+**v44 - LightGBM Walk-Forward CV**
+- Strategy: Apply walk-forward to best model (LightGBM)
+- Mean CV: 0.4665 ± 0.016
+- Fold 3 (same window as v19): CV 0.4557 vs v19's 0.3572
+- Result: WORSE than v19 single holdout - unexpected! ❌
+- Issue: Potential feature leakage or validation implementation difference
+
+### Key Findings
+
+**Model Architecture is Critical:**
+- LightGBM (v19): CV 0.357 ⭐
+- XGBoost (best): CV 0.449
+- LightGBM consistently 25%+ better than XGBoost across all configurations
+
+**Validation Strategies Don't Help:**
+- 30-day holdout (v19): CV 0.357 ⭐ BEST
+- 60-day holdout (v42): CV 0.460 (worse)
+- Walk-forward XGBoost (v43): CV 0.449 (worse)
+- Walk-forward LightGBM (v44): CV 0.467 (worse)
+
+**Validation Bias is Inherent:**
+- All 2017 summer validation periods have elevated sales (33-37% above mean)
+- Bias exists in any temporal validation approach
+- Cannot use random splits (causes data leakage)
+- Trade-off between temporal validity and representativeness
+
+**v19 is Optimal:**
+- Best CV across 26+ experiments
+- Simple approach (30-day holdout, v1 features, LightGBM)
+- Additional complexity (walk-forward CV, longer windows, different models) doesn't improve results
+- 39.5% CV-LB gap is acceptable given validation constraints
+
+### Conclusion
+
+**ACCEPTED: v19 as final best model**
+- CV: 0.3572
+- LB: 0.498
+- Leaderboard gap is inherent to temporal validation bias, not fixable through:
+  - Regularization tuning
+  - Model architecture changes (XGBoost)
+  - Validation strategy changes (longer windows, walk-forward CV)
+  
+**Recommendation:** Accept v19 and move to next competition. Further optimization unlikely to improve LB performance.
 

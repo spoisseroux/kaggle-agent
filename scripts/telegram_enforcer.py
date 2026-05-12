@@ -266,30 +266,45 @@ def check_conversation(conv_file: Path, state: dict[str, Any]) -> int:
     conv_id = conv_file.stem
 
     # Process only new messages since last check
+    processed_count = 0
+    assistant_count = 0
     for i, msg in enumerate(messages[last_checked:], start=last_checked):
+        processed_count += 1
         if msg.get("role") != "assistant":
             continue
 
+        assistant_count += 1
         # Extract text content
         text = extract_text_from_message(msg)
+
+        # Log ALL assistant turns to Langfuse (even tool-use-only for complete tracking)
+        log_result = log_to_langfuse(msg, text, conv_id)
+        if log_result:
+            if text:
+                print(f"[{i}] ✓ Logged to Langfuse ({len(text)} chars text)", flush=True)
+            else:
+                print(f"[{i}] ✓ Logged to Langfuse (tool-use only)", flush=True)
+        else:
+            print(f"[{i}] ✗ Langfuse logging failed", flush=True)
+
+        # Skip Telegram delivery if no text (tool-use-only messages)
         if not text:
             continue
-
-        # Log to Langfuse (always, for cost tracking)
-        if log_to_langfuse(msg, text, conv_id):
-            print(f"[{i}] ✓ Logged to Langfuse ({len(text)} chars)")
 
         # Check if notify.py was called in this turn
         if has_notify_call(msg):
             continue
 
         # No notify.py call found - auto-send to Telegram
-        print(f"[{i}] Missing notify.py call, auto-sending to Telegram")
+        print(f"[{i}] Missing notify.py call, auto-sending to Telegram", flush=True)
         if send_to_telegram(text):
             auto_sent += 1
-            print(f"  ✓ Sent {len(text)} chars")
+            print(f"  ✓ Sent {len(text)} chars", flush=True)
         else:
-            print(f"  ✗ Failed to send")
+            print(f"  ✗ Failed to send", flush=True)
+
+    if processed_count > 0:
+        print(f"Processed {processed_count} messages, {assistant_count} assistant turns", flush=True)
 
     # Update state
     state["last_checked_index"] = len(messages)
