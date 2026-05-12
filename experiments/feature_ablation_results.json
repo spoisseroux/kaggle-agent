@@ -1,0 +1,98 @@
+[
+  {
+    "removed_feature": "onpromotion",
+    "cv_with_removal": 0.42162429374785554,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.011765773433778492,
+    "pct_change": -2.714823048505043,
+    "degraded": false
+  },
+  {
+    "removed_feature": "day_of_week",
+    "cv_with_removal": 0.4234495529494211,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.009940514232212927,
+    "pct_change": -2.293664526475373,
+    "degraded": false
+  },
+  {
+    "removed_feature": "is_weekend",
+    "cv_with_removal": 0.4333900671816312,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -2.831068712794149e-15,
+    "pct_change": -6.532380243979257e-13,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Lag_3",
+    "cv_with_removal": 0.415159793343626,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.018230273838008015,
+    "pct_change": -4.2064355458261335,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Lag_7",
+    "cv_with_removal": 0.42129358511751286,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.012096482064121172,
+    "pct_change": -2.7911304342495535,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Roll_mean_7",
+    "cv_with_removal": 0.4550216081532351,
+    "baseline_cv": 0.43339006718163403,
+    "delta": 0.021631540971601082,
+    "pct_change": 4.991240595861486,
+    "degraded": true
+  },
+  {
+    "removed_feature": "Roll_mean_14",
+    "cv_with_removal": 0.42448415968584,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.008905907495794008,
+    "pct_change": -2.0549403805467317,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Roll_mean_30",
+    "cv_with_removal": 0.43222396909797256,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.001166098083661471,
+    "pct_change": -0.2690643307182115,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Roll_mean_60",
+    "cv_with_removal": 0.4352010359281416,
+    "baseline_cv": 0.43339006718163403,
+    "delta": 0.0018109687465075464,
+    "pct_change": 0.41786115641375976,
+    "degraded": true
+  },
+  {
+    "removed_feature": "Roll_mean_90",
+    "cv_with_removal": 0.42819836174824955,
+    "baseline_cv": 0.43339006718163403,
+    "delta": -0.005191705433384486,
+    "pct_change": -1.1979290312642628,
+    "degraded": false
+  },
+  {
+    "removed_feature": "Roll_std_7",
+    "cv_with_removal": 0.6314366880819369,
+    "baseline_cv": 0.43339006718163403,
+    "delta": 0.19804662090030284,
+    "pct_change": 45.69708350452374,
+    "degraded": true
+  },
+  {
+    "removed_feature": "is_holiday",
+    "cv_with_removal": 0.4360773127801902,
+    "baseline_cv": 0.43339006718163403,
+    "delta": 0.002687245598556154,
+    "pct_change": 0.6200524197592945,
+    "degraded": true
+  }
+]

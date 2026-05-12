@@ -1,0 +1,63 @@
+[
+  {
+    "test_name": "seed_ensemble_2seeds",
+    "cv_score": 0.4359689599717399,
+    "baseline_cv": 0.3572,
+    "delta": 0.07876895997173988,
+    "pct_change": 22.05178050720601,
+    "improved": false,
+    "params": {
+      "seeds": [
+        42,
+        123
+      ],
+      "n_seeds": 2
+    },
+    "metadata": {
+      "test_type": "seed_ensemble"
+    },
+    "timestamp": "2026-05-12T00:16:06.845674"
+  },
+  {
+    "test_name": "seed_ensemble_3seeds",
+    "cv_score": 0.4350963017140367,
+    "baseline_cv": 0.3572,
+    "delta": 0.07789630171403666,
+    "pct_change": 21.807475283884845,
+    "improved": false,
+    "params": {
+      "seeds": [
+        42,
+        123,
+        456
+      ],
+      "n_seeds": 3
+    },
+    "metadata": {
+      "test_type": "seed_ensemble"
+    },
+    "timestamp": "2026-05-12T00:16:38.276287"
+  },
+  {
+    "test_name": "seed_ensemble_5seeds",
+    "cv_score": 0.43381819374051245,
+    "baseline_cv": 0.3572,
+    "delta": 0.07661819374051243,
+    "pct_change": 21.449662301375263,
+    "improved": false,
+    "params": {
+      "seeds": [
+        42,
+        123,
+        456,
+        789,
+        2024
+      ],
+      "n_seeds": 5
+    },
+    "metadata": {
+      "test_type": "seed_ensemble"
+    },
+    "timestamp": "2026-05-12T00:17:29.488230"
+  }
+]
