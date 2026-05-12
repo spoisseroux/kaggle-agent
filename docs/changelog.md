@@ -456,3 +456,56 @@ predictions = 0.7145 * LightGBM + 0.2746 * XGBoost - 0.4937
 **Expected impact:** LB 0.37-0.40 (matching top scorers) if implementation correct.
 
 **Next:** Awaiting user decision on full recursive implementation vs accepting v50/v63 as final.
+
+## 2026-05-12 - Autonomous Overnight Work (Late Night)
+
+**What changed:**
+- Submitted v66 recursive forecasting: LB 0.603 (FAILED, 32% worse than v50)
+- Submitted v63 Ridge 90/10: LB 3.588 (CATASTROPHIC, 688% worse than v50)
+- Discovered systematic bug pattern affecting all recent experiments
+
+**v66 Recursive Results:**
+- Expected LB: 0.37-0.40 (top scorer range)
+- Actual LB: 0.603 (32% worse than v50)
+- Correlation with v19: 0.9903 (high, but predictions 7% lower)
+- Lesson: High correlation doesn't guarantee good performance
+- Cause: Lower predictions (427 vs 461) led to significantly worse LB
+
+**v63 Ridge 90/10 Results:**
+- Expected: Better than v50 (CV 0.3908 vs 0.3925)
+- Actual LB: 3.588 (688% worse than v50!)
+- Correlation with v50: -0.0244 (NEGATIVE, like v32/v33/v34)
+- Cause: Uses cached v51 predictions which have alignment/corruption issues
+
+**Systematic Bug Pattern Identified:**
+All failed experiments have negative or problematic correlation with working models:
+- v32 (recursive): correlation -0.0246, LB 0.594
+- v33 (hierarchical): correlation -0.0327, LB 0.590
+- v34 (recursive fixed): correlation similar, LB 0.594
+- v63 (Ridge 90/10): correlation -0.0244, LB 3.588
+- v66 (recursive full): correlation +0.9903 but 7% lower → LB 0.603
+
+**Only Working Model:**
+- v50 (Ridge 71/27 stacking): LB 0.455
+- Trains models fresh, doesn't use cached predictions
+- 8.7% better than v19 on LB
+
+**Key Insights:**
+1. **Cached predictions problematic**: v63 used v51 cached predictions → catastrophic failure
+2. **Recursive forecasting implementation wrong**: 4 attempts (v32/33/34/66) all failed
+3. **Lower predictions = worse performance**: v66's 7% lower predictions → 21% worse LB
+4. **CV doesn't predict LB**: v63 had better CV (0.3908) but disastrous LB (3.588)
+
+**Current Gap to Top:**
+- Our best: v50 LB 0.455
+- Top leaderboard: 0.377
+- Gap: 21% (still in 70th percentile)
+
+**Status:** 
+- v50 confirmed as only reliable model
+- All optimization attempts failed systematically
+- Likely missing fundamental technique or have persistent implementation bugs
+
+**Submissions today:** 3/5 used (v50, v66, v63)
+
+**Next:** Need to completely rethink approach or accept v50 as final.
