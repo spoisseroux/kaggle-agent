@@ -85,13 +85,13 @@ Best 12 features (95% of predictive power):
 
 ## Current Best Models (Holdout Validation + LB Confirmed)
 
-### v66 - Recursive Forecasting ⭐ EXPECTED TOP SCORER (May 12, 2026)
+### v66 - Recursive Forecasting ❌ FAILED (May 12, 2026)
 - **Implementation**: Full recursive forecasting across all store-family pairs
 - **Predictions**: 28,512 (1,782 pairs × 16 days)
 - **Correlation with v19**: 0.9903 (no prediction inversion)
 - **Mean predictions**: 427 (7% lower than v19's 461)
 - **Expected LB**: 0.37-0.40 (top scorer range based on research)
-- **Actual LB**: Pending submission
+- **Actual LB**: 0.603 (32% WORSE than v50!)
 - **Discovery**: After 3 failed attempts (v32/v33/v34), debugged and validated on single pair, then scaled up
 - **Pattern**: Day-by-day recursive prediction with feature recreation at each step
 - **File**: `lgbm_v66_recursive_full_04523.csv`
@@ -918,3 +918,20 @@ With recursive prediction:
 - Or could be correct (closer to actual test distribution)
 
 Only LB submission will confirm.
+
+### v66 Failure Analysis
+
+**Unexpected result:** LB 0.603 despite 0.99 correlation with v19 (LB 0.498)
+
+**Why correlation didn't predict performance:**
+1. **Scale matters**: 7% lower predictions (427 vs 461) → 21% worse LB (0.603 vs 0.498)
+2. **Direction wrong**: Lower predictions performed worse, not better
+3. **Correlation measures relationship, not accuracy**: High correlation just means predictions move together, not that they're correct
+
+**What this tells us:**
+- Recursive forecasting implementation still has fundamental issues
+- Pattern from notebooks might be missing critical details
+- Or recursive forecasting isn't the technique top scorers use
+- Need to re-examine assumptions
+
+**Current status:** v50 (LB 0.455) remains best validated model.
