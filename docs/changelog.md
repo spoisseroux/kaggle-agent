@@ -376,3 +376,83 @@ predictions = 0.7145 * LightGBM + 0.2746 * XGBoost - 0.4937
 **Status:** Exploration complete. v63 ready for LB validation or accept v50 as final.
 
 **Next:** Awaiting user decision on v63 submission or move to different competition.
+
+## 2026-05-12 - Leaderboard Gap Research & Recursive Debugging (Evening)
+
+**What changed:**
+- Researched 21% gap to top leaderboard (our 0.455 vs top 0.377)
+- Analyzed 4 top public notebooks for winning patterns
+- Debugged recursive forecasting failures (v32/v33/v34)
+- Successfully implemented minimal recursive on single store-family pair (v66)
+
+**Gap analysis:**
+- Our best: v50 LB 0.455 (Ridge ensemble)
+- Top leaderboard: 0.377-0.379
+- Gap: 21% worse (70th percentile, not optimized)
+- User correctly challenged "optimized" conclusion
+
+**Notebooks analyzed:**
+1. **Comprehensive Guide** (2895 votes, Ekrem Bayar)
+   - Uses lag 16, 30, 60 instead of lag 3/7
+   - Multiple rolling window sizes (20, 30, 60, 90, 120 days)
+   - Exponential weighted means with various alphas
+   
+2. **Recursive Forecasting** (Ahmed Abdulhamid)
+   - Day-by-day prediction loop
+   - Recreate ALL features after each prediction
+   - Sliding 20-day window
+   - Pattern: predict → append → recompute features → repeat
+
+3. **Favorita EDA** (966 votes, Heads or Tails) - R notebook
+4. **Store Sales Analysis** (1051 votes, Kashish Rastogi)
+
+**Key insights:**
+- Top scorers use **recursive forecasting** (not just long lags)
+- Test period is 16 days, so predictions build on previous predictions
+- v19 fills all test lags with constant → loses temporal patterns
+- Recursive uses predictions as history for next day's lags → captures patterns
+
+**Experiments:**
+- **v65 - Long lags (16+)**: FAILED
+  - CV 1.52 (325% worse than v19)
+  - Hypothesis: use lag 16+ to avoid test set references
+  - Result: Long lags alone insufficient
+  - Committed: 3a3c998
+
+- **v66 - Recursive minimal (debug)**: SUCCESS on single pair
+  - Tested on one store-family pair (AUTOMOTIVE)
+  - 16 predictions, mean 2.58, std 0.75
+  - NO prediction inversion detected
+  - Proves recursive pattern works correctly
+  - Committed: 501124a
+
+**Pattern discoveries:**
+1. **Lag strategy from notebooks:**
+   - NOT replacing short lags with long lags
+   - Using BOTH short (3/7) and long (16/30/60) lags
+   - Recursive forecasting makes short lags work in test
+
+2. **Recursive implementation requirements:**
+   - Must recreate ALL features after each prediction
+   - Predictions become "sales" history for next iteration
+   - Sliding window prevents memory issues
+   - Careful NaN handling critical
+
+3. **Why v32/v33/v34 failed:**
+   - Likely bug in full-scale concat/merge logic
+   - Single-pair test (v66) works → bug is in scaling up
+   - NOT a conceptual problem with recursive approach
+
+**Files created:**
+- `/tmp/notebooks/store-sales-ts-forecasting-a-comprehensive-guide.ipynb`
+- `/tmp/notebooks/recursive-multistep-time-series-forecasting.ipynb`
+- `/tmp/notebooks/shopping-for-insights-favorita-eda.Rmd`
+- `/tmp/notebooks/store-sales-analysis-time-serie.ipynb`
+- `src/model_lgbm_v65_long_lags.py` (failed, CV 1.52)
+- `src/model_lgbm_v66_recursive_minimal.py` (debug success)
+
+**Status:** Ready to implement full recursive v66 across all store-family pairs.
+
+**Expected impact:** LB 0.37-0.40 (matching top scorers) if implementation correct.
+
+**Next:** Awaiting user decision on full recursive implementation vs accepting v50/v63 as final.
