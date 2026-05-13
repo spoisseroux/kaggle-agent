@@ -1,20 +1,35 @@
 # Changelog
 
-## 2026-05-13 — Kaggle Authentication Update
+## 2026-05-13 — Kaggle Account Switch to nnaqsoft
 
 ### Infrastructure Change
-- **Switched to new Kaggle API token format** ✅
-  - Old: Username + Key (KAGGLE_USERNAME + KAGGLE_KEY env vars)
-  - New: ACCESS_TOKEN (KGAT_* format)
-  - Saved to `~/.kaggle/access_token` (primary)
-  - Set KAGGLE_API_TOKEN environment variable (backup)
-  - Added to ~/.bashrc for persistence
+- **Switched to NEW Kaggle account** ✅
+  - OLD account: spoisseroux (10 submissions to store-sales)
+  - NEW account: nnaqsoft (fresh, no submissions)
+  - Authentication: ACCESS_TOKEN format (KGAT_*)
+
+- **Implementation** ✅
+  - Saved new token to `~/.kaggle/access_token`
+  - Backed up old credentials to `kaggle.json.backup_spoisseroux`
+  - Cleaned environment: unset KAGGLE_USERNAME and KAGGLE_KEY
+  - Set only KAGGLE_API_TOKEN for new account
+  - Updated ~/.bashrc to unset old vars and set new token
+
+- **Troubleshooting** ✅
+  - Issue: Old kaggle.json and env vars took precedence over new token
+  - Fix: Removed kaggle.json, unset old variables, set only new token
+  - Verified in fresh bash session before applying to main session
 
 - **Verification** ✅
-  - Account: spoisseroux (same as before)
+  - Account: nnaqsoft (correct!)
   - Auth method: ACCESS_TOKEN
-  - All previous submissions preserved and accessible
-  - Download and API capabilities tested and working
+  - Fresh account: No competitions entered, zero submissions
+  - API working: Downloads and listings tested
+  - Persistence: .bashrc updated with proper var handling
+
+- **Backup Available** ✅
+  - Old spoisseroux credentials preserved in `~/.kaggle/kaggle.json.backup_spoisseroux`
+  - Can switch back anytime by restoring backup
 
 ## 2026-05-13 — Store Sales Systematic Feature Engineering (v75-v86)
 
