@@ -18,6 +18,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -127,6 +128,51 @@ def _check_api() -> tuple[bool, str]:
         return False, f"FAIL: {str(e)[:80]}"
 
 
+def _check_claude_backend() -> tuple[str, str]:
+    """Identify which Claude backend the agent uses.
+
+    Returns (backend_label, detail).
+    """
+    creds_path = Path.home() / ".claude" / ".credentials.json"
+    has_oauth = False
+    oauth_detail = ""
+    if creds_path.exists():
+        try:
+            data = json.loads(creds_path.read_text())
+            oauth = data.get("claudeAiOauth")
+            if oauth and oauth.get("accessToken"):
+                has_oauth = True
+                exp_ms = oauth.get("expiresAt", 0)
+                if exp_ms:
+                    remaining_min = int((exp_ms / 1000 - time.time()) / 60)
+                    if remaining_min > 0:
+                        oauth_detail = f"token expires in {remaining_min}m"
+                    else:
+                        oauth_detail = f"token expired {-remaining_min}m ago"
+        except Exception:
+            pass
+
+    has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    has_openrouter = bool(os.environ.get("OPENROUTER_API_KEY"))
+    backend_env = os.environ.get("CLAUDE_BACKEND", "").lower()
+
+    # CLI backend (Claude Code subscription) is the default
+    if backend_env == "cli" or (has_oauth and not has_api_key):
+        return ("Claude Max subscription (OAuth)",
+                oauth_detail or "no token expiry info")
+    if backend_env == "api" or has_api_key:
+        key = os.environ.get("ANTHROPIC_API_KEY", "")
+        prefix = key[:10] + "..." if key else "(unset)"
+        return ("Anthropic API (metered)", f"key: {prefix}")
+    if backend_env == "openrouter" and has_openrouter:
+        return ("OpenRouter", "via OPENROUTER_API_KEY")
+    if has_openrouter and has_oauth:
+        # OpenRouter key present but not configured as backend
+        return ("Claude Max (OAuth) — OpenRouter unused for agent",
+                oauth_detail or "")
+    return ("unknown", "no credentials detected")
+
+
 def _get_current_model() -> str:
     try:
         r = httpx.get(f"{API_BASE}/system/model", timeout=3)
@@ -175,9 +221,14 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     lines = ["📊 System diagnostic\n"]
 
-    # Model
+    # Model + backend (where the inference bills against)
     model = _get_current_model()
-    lines.append(f"Model: {model}\n")
+    backend, backend_detail = _check_claude_backend()
+    lines.append(f"Model:   {model}")
+    lines.append(f"Backend: {backend}")
+    if backend_detail:
+        lines.append(f"         ({backend_detail})")
+    lines.append("")
 
     # Services
     lines.append("Services:")
