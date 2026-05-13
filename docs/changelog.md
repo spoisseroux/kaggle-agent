@@ -1,5 +1,59 @@
 # Changelog
 
+## 2026-05-13 — Store Sales Systematic Feature Engineering (v75-v86)
+
+### Work Completed
+- **Distribution Shift Hypothesis (v75-v79)** ❌
+  - Hypothesis: Test period returns to training distribution (mean 356) vs validation (mean 472)
+  - v75: Scaled predictions down by 0.754 → LB 0.47384 (4.3% worse than v67)
+  - Result: Hypothesis BACKWARDS - test has elevated sales like validation
+  - Logged to research DB with 90% confidence
+
+- **Systematic Feature Engineering (v80-v86)** ✅ Research, ❌ Performance
+  - Created `scripts/test_feature_sets.py` - systematic testing framework
+  - Tested 6 feature sets individually against v67 baseline:
+    - v80 Promotion: No data (skipped)
+    - v81 Trend: CV 0.1988 (+49.13% improvement)
+    - v82 Ratio: CV 0.2499 (+36.07% improvement)
+    - v83 Temporal: No data (skipped)
+    - v84 Store metadata: No data (skipped)
+    - v85 Interaction: No data (skipped)
+  - Combined winning features into v86: CV 0.2038 (+47.86%)
+
+- **Leaderboard Validation CATASTROPHIC** ❌
+  - v81 (trend features only): CV 0.1988 → LB 2.09198 (360% WORSE than v67)
+  - v86 (trend+ratio combined): CV 0.2038 → LB 4.69741 (933% WORSE than v67)
+  - Pattern: Large CV improvements, massive LB degradation
+
+### Root Cause Analysis
+**Validation Window Overfitting** (95% confidence)
+- 30-day validation window (Jul 16-Aug 15) has +33% elevated sales vs training
+- Trend and ratio features capture validation-specific patterns, not generalizable patterns
+- Features optimize for validation anomalies → excellent CV, terrible LB
+- Same fundamental issue as v73 hyperparameter tuning
+
+### Key Learnings
+1. **Feature engineering on 30-day validation is unreliable**
+   - v81/v86: +49%/+48% CV improvement → 360%/933% LB degradation
+   - Features that improve CV can destroy generalization
+   - Added to "Invalid approaches" in CLAUDE.md
+
+2. **Validation strategy is critical**
+   - Current 30-day window is NOT representative of test period
+   - Need: multiple validation windows OR earlier/different period
+   - Can't trust CV improvements on this window
+
+3. **v67 remains optimal**
+   - Simple features (12 baseline) generalize best
+   - LB 0.45416 - no improvement from 6 feature engineering attempts
+   - Conservative architecture is fundamentally sound
+
+### Status
+- **Best model**: v67 at LB 0.45416 (unchanged)
+- **Systematic testing**: Valuable negative result - exposed validation limitation
+- **Research DB**: All experiments logged for future reference
+- **Next**: Different validation strategy OR move to new competition
+
 ## 2026-05-13 — Store Sales v67/v73 Submission & Analysis
 
 ### Work Completed

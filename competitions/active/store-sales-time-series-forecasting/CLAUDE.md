@@ -35,6 +35,7 @@
    - Recursive forecasting (v32/v33/v34/v66: all failed)
    - EWM features (v68/v69: degraded performance)
    - Hyperparameter tuning (v20/v73: better CV, worse LB)
+   - Feature engineering on 30-day validation (v81/v86: +49% CV, but LB 2.09/4.69 - features capture validation anomalies)
    - External data with transactions.csv (causes leakage)
 
 ## Research DB Usage
