@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-13 — Kaggle Authentication Update
+
+### Infrastructure Change
+- **Switched to new Kaggle API token format** ✅
+  - Old: Username + Key (KAGGLE_USERNAME + KAGGLE_KEY env vars)
+  - New: ACCESS_TOKEN (KGAT_* format)
+  - Saved to `~/.kaggle/access_token` (primary)
+  - Set KAGGLE_API_TOKEN environment variable (backup)
+  - Added to ~/.bashrc for persistence
+
+- **Verification** ✅
+  - Account: spoisseroux (same as before)
+  - Auth method: ACCESS_TOKEN
+  - All previous submissions preserved and accessible
+  - Download and API capabilities tested and working
+
 ## 2026-05-13 — Store Sales Systematic Feature Engineering (v75-v86)
 
 ### Work Completed
