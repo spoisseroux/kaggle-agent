@@ -114,19 +114,16 @@ PYEOF
     fi
 fi
 
-# ── 4. Refresh failed — alert user and exit ───────────────────────────────
-echo "Token refresh failed — manual login required" >&2
+# ── 4. Refresh failed — warn but don't block ─────────────────────────────
+# Claude handles its own auth internally — a failed refresh via the REST
+# endpoint doesn't mean Claude itself can't start. Only alert, don't exit 1.
+echo "Token refresh failed — Claude will handle auth internally" >&2
 
-notify "🔑 Claude login required — agent cannot start
+notify "⚠️ Claude token auto-refresh failed (will try to continue)
 
-The Claude Max OAuth token has expired and could not be auto-refreshed.
+If the agent fails to start or you see auth errors, run:
+  claude /login
+in the WSL terminal (tray → Open tmux session)."
 
-To fix:
-1. Open WSL terminal (tray → 'Open tmux session')
-2. Run: claude /login
-3. Open the browser link it shows and log in with your Claude Max account
-4. The agent will restart automatically after login
-
-Agent is paused until login is complete."
-
-exit 1
+# exit 0 so start_agent.sh continues — Claude manages its own session
+exit 0
