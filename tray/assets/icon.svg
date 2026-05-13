@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 414 523">
+  <defs>
+    <filter id="drop-shadow-1" filterUnits="userSpaceOnUse">
+      <feOffset dx="3" dy="8"/>
+      <feGaussianBlur result="blur" stdDeviation="18"/>
+      <feFlood flood-color="#000" flood-opacity=".8"/>
+      <feComposite in2="blur" operator="in"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <path d="m204,460.5s-35-28.5-70-65.5c-27.5-29-54-64.5-68-92-31.5-62.5-13-137,59-257l54,74s12-2,25-2.1c13,.1,25,2.1,25,2.1l54-74c72,120,90.5,194.5,59,257-14,27.5-40.5,63-68,92-35,37-70,65.5-70,65.5Z" style="fill: #fff; filter: url(#drop-shadow-1); stroke-width: 0px;"/>
+  <path d="m97,199c31.5,8,57.5,38.5,71,67,15,32.5,9,62-26,50.5-39.5-14-58.5-45-67.5-69-5-13-14.5-58,22.5-48.5Z" style="stroke-width: 0px;"/>
+  <path d="m311,199c-31.5,8-57.5,38.5-71,67-15,32.5-9,62,26,50.5,39.5-14,58.5-45,67.5-69,5-13,14.5-58-22.5-48.5Z" style="stroke-width: 0px;"/>
+  <path d="m204,358l-33,35c-4,4-7,5-13,2-3-2-2-6,0-8l38-43c4-5,12-5,16,0l38,43c2,2,3,6,0,8-6,3-9,2-13-2l-33-35Z" style="stroke-width: 0px;"/>
+</svg>
