@@ -55,11 +55,7 @@ START_TIME = dt.datetime.utcnow()
 # Settings file for agent-specific config (model selection etc.)
 KAGGLE_SETTINGS_PATH = REPO_ROOT / ".claude" / "kaggle_settings.json"
 
-AVAILABLE_MODELS = [
-    "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-6",
-    "claude-opus-4-7",
-]
+from core.models_catalog import get_available_models, get_model_ids  # noqa: E402
 
 app = FastAPI(title="Kaggle Agent API", version=API_VERSION)
 
@@ -356,7 +352,7 @@ def system_hooks() -> dict:
 def get_model() -> dict:
     settings = _read_kaggle_settings()
     current = settings.get("model", "claude-sonnet-4-6")
-    return {"model": current, "available": AVAILABLE_MODELS}
+    return {"model": current, "available": get_available_models()}
 
 
 class ModelUpdate(BaseModel):
@@ -365,8 +361,9 @@ class ModelUpdate(BaseModel):
 
 @app.post("/system/model")
 def set_model(body: ModelUpdate) -> dict:
-    if body.model not in AVAILABLE_MODELS:
-        raise HTTPException(400, f"unknown model; available: {AVAILABLE_MODELS}")
+    valid_ids = get_model_ids()
+    if body.model not in valid_ids:
+        raise HTTPException(400, f"unknown model; available: {valid_ids}")
     settings = _read_kaggle_settings()
     previous_model = settings.get("model")
     settings["model"] = body.model

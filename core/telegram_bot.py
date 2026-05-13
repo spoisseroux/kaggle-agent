@@ -28,12 +28,18 @@ from core.notify import _load_env  # noqa: E402
 _load_env()
 
 import httpx  # noqa: E402
-from telegram import Update  # noqa: E402
+from telegram import (  # noqa: E402
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update,
+)
 from telegram.ext import (  # noqa: E402
-    Application, CommandHandler, MessageHandler, filters, ContextTypes,
+    Application, CallbackQueryHandler, CommandHandler, MessageHandler,
+    filters, ContextTypes,
 )
 
 from core.message_bus import init_db, post_human_message, wake_agent  # noqa: E402
+from core.models_catalog import (  # noqa: E402
+    alert_if_new_models, get_available_models, resolve_alias,
+)
 from core.notify import send_telegram  # noqa: E402
 
 logging.basicConfig(
@@ -43,16 +49,6 @@ logging.basicConfig(
 log = logging.getLogger("telegram_bot")
 
 API_BASE = f"http://localhost:{os.environ.get('API_PORT', '8765')}"
-
-# Short aliases → full model IDs for /model command
-MODEL_ALIASES = {
-    "opus": "claude-opus-4-7",
-    "opus-4-7": "claude-opus-4-7",
-    "sonnet": "claude-sonnet-4-5",
-    "sonnet-4-5": "claude-sonnet-4-5",
-    "sonnet-4-6": "claude-sonnet-4-6",
-    "haiku": "claude-haiku-4-5",
-}
 
 
 # ── auth gate ───────────────────────────────────────────────────────────────
@@ -213,46 +209,82 @@ async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("\n".join(lines))
 
 
-async def cmd_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not _is_authorized(update):
-        return
-    args = context.args or []
-
-    if not args:
-        current = _get_current_model()
-        text = (
-            f"Current model: {current}\n\n"
-            "To change:\n"
-            "  /model opus     — claude-opus-4-7\n"
-            "  /model sonnet   — claude-sonnet-4-5\n"
-            "  /model haiku    — claude-haiku-4-5\n\n"
-            "Changing the model auto-restarts the agent."
-        )
-        await update.message.reply_text(text)
-        return
-
-    alias = args[0].lower().strip()
-    model_id = MODEL_ALIASES.get(alias, alias)
+def _apply_model_change(model_id: str) -> str:
+    """Hit the API to set the model. Returns user-facing result string."""
     try:
         r = httpx.post(f"{API_BASE}/system/model",
                        json={"model": model_id}, timeout=8)
         if r.status_code != 200:
-            await update.message.reply_text(
-                f"❌ Set failed: HTTP {r.status_code} — {r.text[:150]}"
-            )
-            return
+            return f"❌ Set failed: HTTP {r.status_code} — {r.text[:150]}"
         data = r.json()
         if data.get("restarted"):
-            await update.message.reply_text(
-                f"✅ Model set to {data['model']}\n"
-                f"Agent is restarting now — back online in ~10s."
-            )
-        else:
-            await update.message.reply_text(
-                f"✅ Model already set to {data['model']} (no change)"
-            )
+            return (f"✅ Model set to {data['model']}\n"
+                    f"Agent is restarting — back online in ~10s.")
+        return f"✅ Already on {data['model']} (no change)"
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        return f"❌ Error: {e}"
+
+
+async def cmd_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_authorized(update):
+        return
+    args = context.args or []
+    available = get_available_models()
+
+    if args:
+        # Old-style: /model opus
+        resolved = resolve_alias(args[0])
+        if not resolved:
+            avail = ", ".join(m["tier"] for m in available)
+            await update.message.reply_text(
+                f"Unknown model '{args[0]}'. Try: {avail}"
+            )
+            return
+        await update.message.reply_text(_apply_model_change(resolved))
+        return
+
+    # No args: show current + inline buttons for each available model
+    current = _get_current_model()
+    text = (
+        f"Current model: {current}\n\n"
+        "Tap to change (auto-restarts the agent):"
+    )
+    rows = []
+    for m in available:
+        check = " ✓" if m["id"] == current else ""
+        rows.append([InlineKeyboardButton(
+            f"{m['label']}{check}",
+            callback_data=f"model:{m['id']}",
+        )])
+    await update.message.reply_text(
+        text, reply_markup=InlineKeyboardMarkup(rows),
+    )
+
+
+async def on_model_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline-button taps from /model."""
+    query = update.callback_query
+    if not query or not query.data:
+        return
+    # Auth check on the underlying message
+    chat_id = str(query.message.chat_id) if query.message else ""
+    expected = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if expected and chat_id != expected:
+        await query.answer("Unauthorised", show_alert=True)
+        return
+    await query.answer()  # dismiss the "loading" spinner
+
+    if not query.data.startswith("model:"):
+        return
+    model_id = query.data.split(":", 1)[1]
+    result = _apply_model_change(model_id)
+    # Edit the original message to show the result
+    try:
+        await query.edit_message_text(result)
+    except Exception:
+        # Fallback: send a new message
+        if query.message:
+            await query.message.reply_text(result)
 
 
 async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -314,13 +346,50 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 # ── entry point ─────────────────────────────────────────────────────────────
 
+# ── command catalog (also fed to setMyCommands for autocomplete) ────────────
+
+BOT_COMMANDS = [
+    ("help",    "List available commands"),
+    ("status",  "Agent state and active competition"),
+    ("config",  "Full diagnostic — model, services, account"),
+    ("model",   "Show current model or change it"),
+    ("restart", "Restart the agent"),
+    ("pause",   "Pause the agent"),
+    ("resume",  "Resume the agent"),
+    ("stop",    "Stop the agent"),
+]
+
+
+async def _on_startup(app: Application) -> None:
+    """Register commands with Telegram so they autocomplete in the chat UI."""
+    try:
+        await app.bot.set_my_commands(
+            [BotCommand(name, desc) for name, desc in BOT_COMMANDS]
+        )
+        log.info("registered %d bot commands with Telegram", len(BOT_COMMANDS))
+    except Exception as e:
+        log.warning("set_my_commands failed: %s", e)
+
+    # Check for new Anthropic models (24h cached, so safe to run on every boot)
+    try:
+        alert_if_new_models()
+    except Exception as e:
+        log.warning("new-models check failed: %s", e)
+
+
 def main() -> int:
     init_db()
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
         log.error("TELEGRAM_BOT_TOKEN not set")
         return 2
-    app = Application.builder().token(token).build()
+
+    app = (
+        Application.builder()
+        .token(token)
+        .post_init(_on_startup)
+        .build()
+    )
 
     # Slash commands handled locally — never forwarded to the agent
     app.add_handler(CommandHandler("help", cmd_help))
@@ -329,16 +398,21 @@ def main() -> int:
     app.add_handler(CommandHandler("config", cmd_config))
     app.add_handler(CommandHandler("model", cmd_model))
     app.add_handler(CommandHandler("restart", cmd_restart))
-
     app.add_handler(CommandHandler("pause", make_simple_action("pause")))
     app.add_handler(CommandHandler("resume", make_simple_action("resume")))
     app.add_handler(CommandHandler("stop", make_simple_action("stop")))
+
+    # Inline-keyboard button taps from /model
+    app.add_handler(CallbackQueryHandler(on_model_callback, pattern=r"^model:"))
 
     # Anything else: forward to the agent
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
 
     log.info("starting Telegram polling with slash commands enabled")
-    app.run_polling(allowed_updates=["message"], drop_pending_updates=False)
+    app.run_polling(
+        allowed_updates=["message", "callback_query"],
+        drop_pending_updates=False,
+    )
     return 0
 
 

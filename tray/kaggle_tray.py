@@ -60,7 +60,9 @@ STARTUP_TASK_NAME = "Kaggle Agent"
 # WSL distro name (used when opening a terminal)
 WSL_DISTRO = "Ubuntu-24.04"
 
-AVAILABLE_MODELS = [
+# Used only as a last-resort fallback if the API is unreachable when the
+# tray starts. Real list comes from GET /system/model.
+AVAILABLE_MODELS_FALLBACK = [
     ("Haiku 4.5 · fast/cheap", "claude-haiku-4-5-20251001"),
     ("Sonnet 4.6 · balanced",  "claude-sonnet-4-6"),
     ("Opus 4.7 · powerful",    "claude-opus-4-7"),
@@ -254,6 +256,7 @@ class KaggleTray:
         self.run_stage_detail: Optional[str] = None
         self.run_eta_seconds: Optional[int] = None
         self.current_model: str = "claude-sonnet-4-6"
+        self.available_models: list[tuple[str, str]] = list(AVAILABLE_MODELS_FALLBACK)
         self.startup_enabled: Optional[bool] = None  # None = task not found
 
         self._stop = threading.Event()
@@ -309,7 +312,7 @@ class KaggleTray:
             return checked
 
         model_items = []
-        for label, model_id in AVAILABLE_MODELS:
+        for label, model_id in self.available_models:
             model_items.append(
                 pystray.MenuItem(
                     label,
@@ -394,7 +397,18 @@ class KaggleTray:
         try:
             r = requests.get(f"{API_BASE}/system/model", timeout=HTTP_TIMEOUT)
             if r.status_code == 200:
-                self.current_model = r.json().get("model", self.current_model)
+                data = r.json()
+                self.current_model = data.get("model", self.current_model)
+                # Replace fallback with the live catalog from the API
+                live = data.get("available") or []
+                if live:
+                    self.available_models = [
+                        (m["label"], m["id"]) for m in live
+                        if isinstance(m, dict) and "label" in m and "id" in m
+                    ] or self.available_models
+                    # Menu was built with stale list — rebuild it now
+                    self.icon.menu = self._build_menu()
+                    self._refresh_icon()
         except Exception:
             pass
 
