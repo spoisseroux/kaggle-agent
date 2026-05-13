@@ -346,7 +346,7 @@ class KaggleTray:
             pystray.MenuItem("Open Dashboard", self._open_dashboard),
             pystray.MenuItem("Open tmux session", self._open_tmux),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Model", pystray.Menu(*model_items)),
+            pystray.MenuItem("Model  (restarts agent)", pystray.Menu(*model_items)),
             pystray.MenuItem(
                 startup_label,
                 self._toggle_startup,
@@ -433,6 +433,15 @@ class KaggleTray:
             )
             if r.status_code == 200:
                 self.current_model = model_id
+                # Backend auto-restarts the agent on model change.
+                # Reflect that visually so the user knows it's reloading.
+                data = r.json() if r.content else {}
+                if data.get("restarted"):
+                    self._set_state(
+                        "transitioning",
+                        since_ts=self.since_ts,
+                        active_competition=self.active_competition,
+                    )
                 self._refresh_icon()
         except Exception:
             pass

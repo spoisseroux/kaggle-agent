@@ -368,13 +368,48 @@ def set_model(body: ModelUpdate) -> dict:
     if body.model not in AVAILABLE_MODELS:
         raise HTTPException(400, f"unknown model; available: {AVAILABLE_MODELS}")
     settings = _read_kaggle_settings()
+    previous_model = settings.get("model")
     settings["model"] = body.model
     _write_kaggle_settings(settings)
+
+    # If the model actually changed, auto-restart the agent so it picks up
+    # the new model without requiring the user to manually restart.
+    restarted = False
+    if previous_model != body.model:
+        try:
+            import subprocess
+            subprocess.Popen(
+                ["bash", str(REPO_ROOT / "scripts" / "restart_agent.sh")],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            restarted = True
+        except Exception:
+            pass
+
     return {
         "model": body.model,
-        "restart_required": True,
-        "note": "Model takes effect when the agent session restarts (stop + resume)",
+        "previous": previous_model,
+        "restarted": restarted,
+        "note": "Model change triggers an agent restart" if restarted else "No change",
     }
+
+
+@app.post("/system/restart")
+def system_restart() -> dict:
+    """Restart the Claude Code agent in the kaggle-agent tmux session."""
+    try:
+        import subprocess
+        subprocess.Popen(
+            ["bash", str(REPO_ROOT / "scripts" / "restart_agent.sh")],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, f"restart failed: {e}")
 
 
 # ---------- competitions ----------
