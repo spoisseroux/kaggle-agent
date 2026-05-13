@@ -105,7 +105,7 @@ except Exception as e:
     print(f"FAIL: {e}", file=sys.stderr)
     sys.exit(1)
 PYEOF
-    )
+    ) || true  # don't let set -e kill the script on refresh failure
 
     if [ "$RESPONSE" = "REFRESHED" ]; then
         echo "Token refreshed successfully"
