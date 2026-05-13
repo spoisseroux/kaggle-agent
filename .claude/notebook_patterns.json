@@ -1,0 +1,42 @@
+{
+  "store-sales-ts-forecasting-a-comprehensive-guide.ipynb": {
+    "lag_features": [
+      "60",
+      "30",
+      "1",
+      "16"
+    ],
+    "rolling_windows": [
+      "20"
+    ],
+    "exponential_smoothing": true,
+    "hierarchical": true
+  },
+  "store-sales-analysis-time-serie.ipynb": {
+    "hierarchical": true
+  },
+  "ecuador-store-sales-global-forecasting-lightgbm.ipynb": {
+    "rolling_windows": [],
+    "hierarchical": true
+  },
+  "darts-forecasting-deep-learning-global-models.ipynb": {
+    "lag_features": [],
+    "models": [
+      "RNN",
+      "Prophet"
+    ],
+    "hierarchical": true
+  },
+  "recursive-multistep-time-series-forecasting.ipynb": {
+    "lag_features": [
+      "1"
+    ],
+    "rolling_windows": [],
+    "models": [
+      "LightGBM"
+    ],
+    "validation": "holdout",
+    "recursive_forecasting": true
+  },
+  "multi-agent-workflow-with-langgraph.ipynb": {}
+}

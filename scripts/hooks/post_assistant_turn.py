@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-assistant turn hook - Log to Langfuse for observability.
+"""Post-assistant turn hook - Log to Langfuse and forward to Telegram.
 
 Logs each assistant response to Langfuse with:
 - Estimated token usage & cost
@@ -8,7 +8,8 @@ Logs each assistant response to Langfuse with:
 - Model used
 - Conversation context
 
-This enables cost tracking and usage monitoring for Claude Code.
+Also forwards all assistant text messages to Telegram for 100% message delivery.
+This ensures the user receives every response via Telegram, not just manual notify() calls.
 """
 from __future__ import annotations
 
@@ -172,6 +173,27 @@ def log_to_langfuse(event: Dict[str, Any]) -> bool:
         return False
 
 
+def forward_to_telegram(event: Dict[str, Any]) -> bool:
+    """Forward assistant message to Telegram."""
+    try:
+        content = event.get("content", [])
+        if isinstance(content, str):
+            text = content
+        else:
+            text = extract_text(content)
+
+        # Only send if there's actual text (not just tool calls)
+        if not text or not text.strip():
+            return False
+
+        # Use notify.py to send
+        from core.notify import send_telegram
+        return send_telegram(text)
+    except Exception:
+        # Silently fail - don't break the agent
+        return False
+
+
 def main() -> int:
     """Hook entry point."""
     try:
@@ -181,6 +203,9 @@ def main() -> int:
 
     # Log to Langfuse
     log_to_langfuse(event)
+
+    # Forward to Telegram
+    forward_to_telegram(event)
 
     return 0
 

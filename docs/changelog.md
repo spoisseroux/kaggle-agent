@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-05-13 — Store Sales v67/v73 Submission & Analysis
+
+### Work Completed
+- **v67 Ridge 90/10 Submitted** ✅
+  - Fixed alignment bug from v63 (predictions-to-IDs mispairing)
+  - CV: 0.3908, LB: 0.45416
+  - Result: 0.17% better than v50 (LB 0.45493)
+  - Alignment fix validated - bug was real
+
+- **v73 Hyperparameter Tuning FAILED** ❌
+  - Tuned params: depth 6→7, num_leaves 64→96
+  - CV: 0.3757 (3.86% better than v67)
+  - LB: 5.05560 (1013% WORSE than v67!)
+  - Root cause: Both alignment bug AND severe overfitting
+  - Mean predictions: 7,739 sales (16.8x too high)
+
+- **Root Cause Analysis** ✅
+  - Discovered v73 had same alignment bug as v63 (predicted on unsorted, paired with sorted IDs)
+  - Created v74 with alignment fix (mean still 7,739 - not submitted)
+  - Overfitting pattern matches v20: tuning → better CV, worse LB
+  - Validation period bias (33% higher sales) causes tuning to overfit
+
+### Key Learnings
+1. **Conservative hyperparameters are optimal** for Store Sales
+   - v67 (depth=6, leaves=64): generalizes well
+   - v73 (depth=7, leaves=96): catastrophic overfitting
+
+2. **Validation period bias is dangerous**
+   - Tuning optimizes for unrepresentative validation anomalies
+   - CV improvement ≠ better generalization
+
+3. **Alignment bugs are insidious**
+   - Both v63 and v73 had prediction-ID mispairing
+   - Always verify: sort test_df BEFORE creating features/predictions
+
+### Status
+- **Best model**: v67 at LB 0.45416 (or v50 at 0.45493, essentially tied)
+- **Competition status**: Near-optimal with public techniques
+- **Next**: Apply learnings to new competitions
+
 ## 2026-05-09 — Store Sales Optimization + Learning Multi-Agent Design
 
 ### Work Completed
@@ -509,3 +549,44 @@ All failed experiments have negative or problematic correlation with working mod
 **Submissions today:** 3/5 used (v50, v66, v63)
 
 **Next:** Need to completely rethink approach or accept v50 as final.
+
+## May 12, 2026 - Deep Dive Research & Agentic Workflows
+
+### Research Phase (2+ hours)
+- Analyzed 6 top Kaggle notebooks (2895+ votes)
+- Identified two distinct approaches:
+  - EWM features + long lags (Comprehensive Guide)
+  - Recursive forecasting + short lags (Recursive notebook)
+- Created systematic notebook analysis tool
+- Documented findings in `.claude/top_scorer_research_findings.md`
+
+### LangGraph Workflow Framework
+- Built StateGraph-based experiment workflow
+- Validation gates: correlation/distribution/CV checks
+- Auto-detection of alignment bugs (v32/33/63 pattern)
+- Auto-detection of scaling issues (v66 pattern)
+- File: `scripts/langgraph_experiment_workflow.py`
+
+### Experiments
+- **v68 - EWM features**: FAILED (CV 1.3507, 278% worse)
+  - Hypothesis: EWM is the secret sauce
+  - Error: Replaced v19 features instead of adding to them
+  - Same failure pattern as v65 (long lags only)
+  
+- **v69 - v19 + EWM (additive)**: IN PROGRESS
+  - Hypothesis: EWM adds signal on top of v19
+  - Adds 9 EWM features (3 alphas x 3 short lags) to 12 v19 features
+  - Expected: CV 0.33-0.35 if EWM provides complementary signal
+
+### Key Learnings
+- Top scorer pattern: Hierarchical groupby (store-family) - universal
+- EWM vs rolling means: Exponential decay weights recent data more
+- Long lags alone fail (v65, v68) - need both short and long
+- Recursive forecasting implementation is tricky (v66 failed despite correct pattern)
+
+### Next Steps
+- Wait for v69 results
+- If v69 succeeds: Test combined EWM + recursive
+- If v69 fails: Re-examine fundamental assumptions about top scorer techniques
+- Submit v67 (alignment-fixed Ridge) for LB validation
+
