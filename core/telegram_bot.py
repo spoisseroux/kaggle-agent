@@ -542,6 +542,9 @@ async def _handle_login_code(update: Update, code: str) -> None:
     creds_path = Path.home() / ".claude" / ".credentials.json"
     mtime_before = creds_path.stat().st_mtime if creds_path.exists() else 0
 
+    # Immediate ack so the user knows we got the code and are working on it
+    await update.message.reply_text("🔑 Code received — completing login…")
+
     # The OAuth code contains '#' which tmux send-keys mis-interprets, AND
     # the Claude TUI's paste field reliably accepts only paste-buffer-injected
     # text (not key-by-key simulation). Use a named buffer.
