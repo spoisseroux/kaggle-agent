@@ -17,21 +17,21 @@
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "wsl.exe -d Ubuntu-24.04 -- bash -c \"cd /home/keehar/kaggle-agent && source /home/keehar/kaggle-venv/bin/activate && python scripts/hooks/pre_compact.py\""
+        "command": "python scripts/hooks/pre_compact.py"
       }]
     }],
     "Stop": [{
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "wsl.exe -d Ubuntu-24.04 -- bash -c \"cd /home/keehar/kaggle-agent && source /home/keehar/kaggle-venv/bin/activate && python scripts/hooks/on_stop.py\""
+        "command": "python scripts/hooks/on_stop.py"
       }]
     }],
     "PostToolUse": [{
       "matcher": "Bash",
       "hooks": [{
         "type": "command",
-        "command": "wsl.exe -d Ubuntu-24.04 -- bash -c \"cd /home/keehar/kaggle-agent && source /home/keehar/kaggle-venv/bin/activate && python scripts/hooks/post_bash.py\""
+        "command": "python scripts/hooks/post_bash.py"
       }]
     }]
   }
