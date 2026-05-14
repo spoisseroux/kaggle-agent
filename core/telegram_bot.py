@@ -389,6 +389,39 @@ async def on_model_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await query.message.reply_text(result)
 
 
+_URL_CONTINUATION = __import__("re").compile(r"^[A-Za-z0-9%._~:/?#\[\]@!$&'()*+,;=\-]+$")
+
+
+def _extract_wrapped_oauth_url(pane_text: str) -> str | None:
+    """Find a Claude OAuth URL in tmux pane output, joining hard-wrapped lines.
+
+    The Claude TUI renders the URL inside a fixed-width box, hard-wrapping
+    every ~80 chars. Strategy: find the line containing 'https://...claude...',
+    then greedily concatenate subsequent lines that look like URL continuations
+    (no whitespace, only URL-safe characters).
+    """
+    lines = [ln.strip() for ln in pane_text.splitlines()]
+    for i, ln in enumerate(lines):
+        if "://" not in ln:
+            continue
+        # Must look like a Claude/Anthropic OAuth URL
+        if not any(d in ln for d in ("claude.com", "claude.ai", "anthropic.com")):
+            continue
+        idx = ln.find("http")
+        if idx < 0:
+            continue
+        url = ln[idx:]
+        # Append continuation lines
+        j = i + 1
+        while j < len(lines) and lines[j] and _URL_CONTINUATION.match(lines[j]):
+            url += lines[j]
+            j += 1
+        # Final sanity check — must contain the expected oauth path
+        if "oauth" in url and ("state=" in url or "client_id=" in url):
+            return url
+    return None
+
+
 async def cmd_login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start a fresh `claude /login` flow and pipe the auth URL to Telegram.
 
@@ -433,22 +466,18 @@ async def cmd_login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ])
 
     # Poll the pane up to ~15s for the auth URL to appear.
-    # Use -J so tmux joins wrapped lines (the URL spans multiple rows in
-    # the TUI). Match any *.claude.com / *.anthropic.com OAuth URL.
+    # The TUI hard-wraps the URL across multiple lines (fixed-width box),
+    # so we scan line-by-line and concatenate URL-shape continuations.
     url = None
     for _ in range(15):
         await asyncio.sleep(1)
         pane = subprocess.run(
-            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p", "-J",
-             "-S", "-100"],
+            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p",
+             "-S", "-200"],
             capture_output=True, text=True,
         )
-        m = re.search(
-            r"https://(?:[a-z0-9.-]*\.)?(?:claude\.com|claude\.ai|anthropic\.com)/[^\s\"']+",
-            pane.stdout,
-        )
-        if m:
-            url = m.group(0)
+        url = _extract_wrapped_oauth_url(pane.stdout)
+        if url:
             break
 
     if not url:
