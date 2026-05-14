@@ -39,11 +39,50 @@ import pystray
 import requests
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-API_BASE = "http://localhost:8765"
+API_PORT = 8765
 DASHBOARD_URL = "https://kaggle-ui.nnaq.net"
 POLL_INTERVAL_S = 5
 HTTP_TIMEOUT = 4
 ACTION_TIMEOUT = 20
+
+
+def _discover_api_base() -> str:
+    """Find a working API URL.
+
+    WSL2's localhost forwarding sometimes breaks (especially after long
+    sessions or memory pressure). Try localhost first, fall back to the
+    WSL IP discovered via `wsl hostname -I`, then a generic public mount.
+    """
+    candidates = [f"http://localhost:{API_PORT}"]
+
+    # Try to discover the live WSL IP from Windows side
+    try:
+        import subprocess as _sp
+        r = _sp.run(
+            ["wsl.exe", "-d", "Ubuntu-24.04", "--", "hostname", "-I"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if r.returncode == 0:
+            for ip in r.stdout.split():
+                if ip and "." in ip:
+                    candidates.append(f"http://{ip}:{API_PORT}")
+                    break
+    except Exception:
+        pass
+
+    # Probe each candidate, take the first that responds
+    for url in candidates:
+        try:
+            r = requests.get(f"{url}/system/state", timeout=2)
+            if r.status_code == 200:
+                return url
+        except Exception:
+            continue
+    # Nothing worked — return localhost so existing behavior stays
+    return candidates[0]
+
+
+API_BASE = _discover_api_base()
 
 ICON_SIZE = 64
 ICON_FILE = Path(__file__).parent / "icon.png"
