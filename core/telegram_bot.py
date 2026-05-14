@@ -422,18 +422,31 @@ async def cmd_login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Enter",
     ])
 
-    # Poll the pane up to ~15s for the auth URL to appear
+    # First screen is a 3-option menu (subscription/API/3rd-party). Option 1
+    # is highlighted by default — wait for the menu to render, then press
+    # Enter to select Claude subscription, which generates the OAuth URL.
     import asyncio
     import re
+    await asyncio.sleep(3)
+    subprocess.run([
+        "tmux", "send-keys", "-t", LOGIN_SESSION, "Enter",
+    ])
+
+    # Poll the pane up to ~15s for the auth URL to appear.
+    # Use -J so tmux joins wrapped lines (the URL spans multiple rows in
+    # the TUI). Match any *.claude.com / *.anthropic.com OAuth URL.
     url = None
     for _ in range(15):
         await asyncio.sleep(1)
         pane = subprocess.run(
-            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p", "-S", "-50"],
+            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p", "-J",
+             "-S", "-100"],
             capture_output=True, text=True,
         )
-        m = re.search(r"https://(?:claude\.ai|console\.anthropic\.com)/[^\s\"']+",
-                      pane.stdout)
+        m = re.search(
+            r"https://(?:[a-z0-9.-]*\.)?(?:claude\.com|claude\.ai|anthropic\.com)/[^\s\"']+",
+            pane.stdout,
+        )
         if m:
             url = m.group(0)
             break
