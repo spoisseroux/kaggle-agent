@@ -542,11 +542,21 @@ async def _handle_login_code(update: Update, code: str) -> None:
     creds_path = Path.home() / ".claude" / ".credentials.json"
     mtime_before = creds_path.stat().st_mtime if creds_path.exists() else 0
 
-    subprocess.run(["tmux", "send-keys", "-t", LOGIN_SESSION, code, "Enter"])
+    # The OAuth code contains '#' which tmux send-keys mis-interprets, AND
+    # the Claude TUI's paste field reliably accepts only paste-buffer-injected
+    # text (not key-by-key simulation). Use a named buffer.
+    subprocess.run(["tmux", "set-buffer", "-b", "login_code", code])
+    subprocess.run([
+        "tmux", "paste-buffer", "-b", "login_code", "-t", LOGIN_SESSION,
+    ])
+    # Brief pause so the TUI sees the paste before we press Enter
+    await asyncio.sleep(0.5)
+    subprocess.run(["tmux", "send-keys", "-t", LOGIN_SESSION, "Enter"])
 
-    # Poll for credentials file to update (means login succeeded)
+    # Poll for credentials file to update (means login succeeded).
+    # OAuth round-trip can take a few seconds — give it 30s.
     success = False
-    for _ in range(12):
+    for _ in range(30):
         await asyncio.sleep(1)
         if creds_path.exists() and creds_path.stat().st_mtime > mtime_before:
             success = True
