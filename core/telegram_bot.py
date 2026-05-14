@@ -50,6 +50,56 @@ logging.basicConfig(
 log = logging.getLogger("telegram_bot")
 
 API_BASE = f"http://localhost:{os.environ.get('API_PORT', '8765')}"
+AGENT_SESSION = "kaggle-agent"
+LOGIN_SESSION = "kaggle-login"
+LOGIN_STATE_FILE = Path("/tmp/kaggle_agent_login_state.json")
+LOGIN_TIMEOUT_S = 600  # 10 min for user to come back with the code
+
+
+# ── agent state helpers ─────────────────────────────────────────────────────
+
+def _tmux_session_exists(name: str) -> bool:
+    try:
+        r = subprocess.run(
+            ["tmux", "has-session", "-t", name],
+            capture_output=True, timeout=2,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _agent_is_running() -> bool:
+    return _tmux_session_exists(AGENT_SESSION)
+
+
+# ── login-flow state (file-backed, survives bot restart) ────────────────────
+
+def _set_login_pending() -> None:
+    LOGIN_STATE_FILE.write_text(json.dumps({
+        "awaiting_code": True,
+        "started_at": time.time(),
+    }))
+
+
+def _get_login_state() -> dict | None:
+    if not LOGIN_STATE_FILE.exists():
+        return None
+    try:
+        data = json.loads(LOGIN_STATE_FILE.read_text())
+    except Exception:
+        return None
+    if time.time() - data.get("started_at", 0) > LOGIN_TIMEOUT_S:
+        _clear_login_state()
+        return None
+    return data
+
+
+def _clear_login_state() -> None:
+    try:
+        LOGIN_STATE_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 # ── auth gate ───────────────────────────────────────────────────────────────
@@ -197,7 +247,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Available commands:\n\n"
         "/status   — agent state and active competition\n"
         "/config   — full system diagnostic (model, services, account)\n"
-        "/model    — show current model, or /model opus|sonnet|haiku to change\n"
+        "/model    — show current model, or pick a new one via buttons\n"
+        "/login    — re-authenticate Claude (URL sent here, paste code back)\n"
         "/restart  — restart the agent (picks up settings changes)\n"
         "/pause    — pause the agent\n"
         "/resume   — resume after pause\n"
@@ -338,6 +389,71 @@ async def on_model_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await query.message.reply_text(result)
 
 
+async def cmd_login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start a fresh `claude /login` flow and pipe the auth URL to Telegram.
+
+    The user opens the URL in a browser, logs in, gets a code, then sends
+    the code back here as their next message — we feed it to the CLI and
+    restart the agent on success.
+    """
+    if not _is_authorized(update):
+        return
+
+    await update.message.reply_text("🔑 Starting Claude login flow…")
+
+    # Recreate the login tmux session cleanly
+    subprocess.run(["tmux", "kill-session", "-t", LOGIN_SESSION],
+                   capture_output=True)
+    r = subprocess.run(
+        ["tmux", "new-session", "-d", "-s", LOGIN_SESSION,
+         "-c", "/home/keehar/kaggle-agent"],
+        capture_output=True,
+    )
+    if r.returncode != 0:
+        await update.message.reply_text(
+            f"❌ Couldn't create tmux session: {r.stderr.decode()[:200]}"
+        )
+        return
+
+    # Fire `claude /login` in the new session
+    subprocess.run([
+        "tmux", "send-keys", "-t", LOGIN_SESSION,
+        "source /home/keehar/kaggle-venv/bin/activate && claude /login",
+        "Enter",
+    ])
+
+    # Poll the pane up to ~15s for the auth URL to appear
+    import asyncio
+    import re
+    url = None
+    for _ in range(15):
+        await asyncio.sleep(1)
+        pane = subprocess.run(
+            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p", "-S", "-50"],
+            capture_output=True, text=True,
+        )
+        m = re.search(r"https://(?:claude\.ai|console\.anthropic\.com)/[^\s\"']+",
+                      pane.stdout)
+        if m:
+            url = m.group(0)
+            break
+
+    if not url:
+        await update.message.reply_text(
+            "❌ Couldn't extract the login URL after 15s.\n"
+            "Run `claude /login` manually in tmux."
+        )
+        return
+
+    _set_login_pending()
+    await update.message.reply_text(
+        f"Open this in your browser, log in, and copy the code back here:\n\n"
+        f"{url}\n\n"
+        f"⏱ I'll wait 10 minutes for your reply. Send the code as your next "
+        f"message (it usually starts with 'sk-ant-' or is a long random string)."
+    )
+
+
 async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_authorized(update):
         return
@@ -376,6 +492,58 @@ def make_simple_action(action: str):
 
 # ── regular text handler (forwards to agent) ────────────────────────────────
 
+async def _handle_login_code(update: Update, code: str) -> None:
+    """Pipe the user-provided login code into the kaggle-login tmux session
+    and check whether credentials.json was updated. Restart agent on success.
+    """
+    import asyncio
+    creds_path = Path.home() / ".claude" / ".credentials.json"
+    mtime_before = creds_path.stat().st_mtime if creds_path.exists() else 0
+
+    subprocess.run(["tmux", "send-keys", "-t", LOGIN_SESSION, code, "Enter"])
+
+    # Poll for credentials file to update (means login succeeded)
+    success = False
+    for _ in range(12):
+        await asyncio.sleep(1)
+        if creds_path.exists() and creds_path.stat().st_mtime > mtime_before:
+            success = True
+            break
+
+    if not success:
+        # Capture the pane so the user can see what went wrong
+        pane = subprocess.run(
+            ["tmux", "capture-pane", "-t", LOGIN_SESSION, "-p", "-S", "-15"],
+            capture_output=True, text=True,
+        )
+        tail = pane.stdout.strip().split("\n")[-10:]
+        await update.message.reply_text(
+            "❌ Login didn't complete in 12s. Last output:\n\n"
+            + "\n".join(tail)[-1500:]
+            + "\n\nSend another /login to retry, or open tmux manually."
+        )
+        return
+
+    _clear_login_state()
+    # Kill the login session — it's done
+    subprocess.run(["tmux", "kill-session", "-t", LOGIN_SESSION],
+                   capture_output=True)
+    # Restart the agent so it picks up the fresh token
+    try:
+        httpx.post(f"{API_BASE}/system/restart", timeout=5)
+    except Exception:
+        # API might be down too — fall back to direct script
+        subprocess.Popen(
+            ["bash", "/home/keehar/kaggle-agent/scripts/restart_agent.sh"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+    await update.message.reply_text(
+        "✅ Login successful. Agent restarting — back online in ~10s."
+    )
+
+
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -386,6 +554,24 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     text = update.message.text.strip()
     if not text:
         return
+
+    # 1. Are we waiting on a login code from a previous /login?
+    if _get_login_state():
+        log.info("received text while awaiting login code — piping to CLI")
+        await _handle_login_code(update, text)
+        return
+
+    # 2. Is the agent actually running? Don't fake "thinking..." if it isn't.
+    if not _agent_is_running():
+        await update.message.reply_text(
+            "⚠️ Agent is offline — no tmux session running.\n\n"
+            "If your Claude token expired:  /login  (does it via Telegram)\n"
+            "If services need to come back:  /restart\n"
+            "Check what broke:               /config"
+        )
+        return
+
+    # 3. Normal path — forward to the agent
     msg_id = post_human_message(text, source="telegram")
     log.info("ingested telegram message %s (%d chars)", msg_id, len(text))
     try:
@@ -404,6 +590,7 @@ BOT_COMMANDS = [
     ("status",  "Agent state and active competition"),
     ("config",  "Full diagnostic — model, services, account"),
     ("model",   "Show current model or change it"),
+    ("login",   "Re-authenticate Claude via Telegram"),
     ("restart", "Restart the agent"),
     ("pause",   "Pause the agent"),
     ("resume",  "Resume the agent"),
@@ -448,6 +635,7 @@ def main() -> int:
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("config", cmd_config))
     app.add_handler(CommandHandler("model", cmd_model))
+    app.add_handler(CommandHandler("login", cmd_login))
     app.add_handler(CommandHandler("restart", cmd_restart))
     app.add_handler(CommandHandler("pause", make_simple_action("pause")))
     app.add_handler(CommandHandler("resume", make_simple_action("resume")))
