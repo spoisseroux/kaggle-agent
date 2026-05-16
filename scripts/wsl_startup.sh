@@ -25,14 +25,12 @@ sudo -n /bin/systemctl start telegram-bot kaggle-api mlflow ollama || true
 sleep 5
 curl -s -X POST localhost:8765/system/resume || true
 
-# Persistent tmux session running the agent loop
-if ! tmux has-session -t kaggle-agent 2>/dev/null; then
-    tmux new-session -d -s kaggle-agent -c /home/keehar/kaggle-agent \
-        "bash scripts/start_agent.sh"
-    echo "Created kaggle-agent tmux session"
-else
-    echo "kaggle-agent tmux session already exists"
-fi
+# Persistent tmux session running the agent loop.
+# Use restart_agent.sh which kills any stale process + creates a fresh
+# session — handles the "tmux session exists but claude inside died" case
+# that previously left the tray red after a crash.
+bash /home/keehar/kaggle-agent/scripts/restart_agent.sh
+echo "kaggle-agent session bootstrapped via restart_agent.sh"
 
 # Start the backend file watcher (restarts kaggle-api on source changes)
 sudo -n /bin/systemctl start kaggle-api-watch || true
