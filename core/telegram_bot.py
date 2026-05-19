@@ -599,6 +599,92 @@ async def _handle_login_code(update: Update, code: str) -> None:
     )
 
 
+INBOX_DIR = Path("/home/keehar/kaggle-agent/inbox")
+# Telegram Bot API can download files up to 20 MB; we cap a bit lower
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+# Files this size and under get their content excerpted inline to the agent
+INLINE_PREVIEW_BYTES = 8 * 1024
+
+
+async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """User uploaded a file — save it to inbox/ and tell the agent.
+
+    Works for any file type. Text-like files (.md, .txt, .py, .json, .yaml,
+    .csv, etc.) under 8 KB get a content preview included with the message.
+    Larger files / binaries get a path + size + caption only.
+    """
+    if not update.message or not update.message.document:
+        return
+    if not _is_authorized(update):
+        return
+
+    doc = update.message.document
+    caption = (update.message.caption or "").strip()
+
+    if doc.file_size and doc.file_size > MAX_UPLOAD_BYTES:
+        await update.message.reply_text(
+            f"❌ File too large ({doc.file_size / 1024 / 1024:.1f} MB). "
+            f"Telegram bot uploads cap out at 15 MB — paste content "
+            f"directly or commit the file to the repo and reference it."
+        )
+        return
+
+    INBOX_DIR.mkdir(parents=True, exist_ok=True)
+    # Use timestamp prefix so repeated uploads with same name don't clobber
+    fname = f"{int(time.time())}_{doc.file_name or 'upload.bin'}"
+    dest = INBOX_DIR / fname
+
+    try:
+        tg_file = await doc.get_file()
+        await tg_file.download_to_drive(custom_path=str(dest))
+    except Exception as e:
+        await update.message.reply_text(f"❌ Download failed: {e}")
+        return
+
+    size_kb = dest.stat().st_size / 1024
+    log.info("received file %s (%.1f KB) → %s", doc.file_name, size_kb, dest)
+
+    # Build the agent-facing message
+    parts = [
+        f"📎 User uploaded a file via Telegram:",
+        f"   Path: {dest}",
+        f"   Original name: {doc.file_name}",
+        f"   Size: {size_kb:.1f} KB",
+        f"   MIME: {doc.mime_type or 'unknown'}",
+    ]
+    if caption:
+        parts.append(f"   Caption: {caption}")
+
+    # Inline preview for small text files so the agent has immediate context
+    text_like = (
+        (doc.mime_type or "").startswith("text/")
+        or (doc.file_name or "").lower().endswith((
+            ".md", ".txt", ".py", ".json", ".yaml", ".yml",
+            ".csv", ".tsv", ".sh", ".js", ".ts", ".html",
+            ".xml", ".toml", ".ini", ".log",
+        ))
+    )
+    if text_like and dest.stat().st_size <= INLINE_PREVIEW_BYTES:
+        try:
+            content = dest.read_text(errors="replace")
+            parts.append(f"\nContents:\n```\n{content}\n```")
+        except Exception:
+            parts.append("\n(could not decode as text)")
+    elif text_like:
+        parts.append(f"\nFile is text but {size_kb:.0f} KB — read it with the Read tool when needed.")
+    else:
+        parts.append("\nBinary file — handle with the appropriate tool if needed.")
+
+    message_to_agent = "\n".join(parts)
+
+    msg_id = post_human_message(message_to_agent, source="telegram")
+    log.info("ingested file upload as message %s", msg_id)
+    await update.message.reply_text(
+        f"📎 Saved to inbox/{fname} ({size_kb:.1f} KB) — telling agent now…"
+    )
+    wake_agent(message_to_agent)
+
+
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -698,6 +784,9 @@ def main() -> int:
 
     # Inline-keyboard button taps from /model
     app.add_handler(CallbackQueryHandler(on_model_callback, pattern=r"^model:"))
+
+    # File uploads → save to inbox/ and tell the agent about them
+    app.add_handler(MessageHandler(filters.Document.ALL, on_document))
 
     # Anything else: forward to the agent
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
