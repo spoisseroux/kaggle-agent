@@ -396,7 +396,10 @@ class KaggleTray:
                 enabled=lambda _: self.startup_enabled is not None,
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit tray", self._quit),
+            pystray.MenuItem("Shutdown everything & quit",
+                             self._shutdown_and_quit),
+            pystray.MenuItem("Quit tray  (leave agent running)",
+                             self._quit),
         )
 
     def _refresh_icon(self) -> None:
@@ -506,6 +509,31 @@ class KaggleTray:
         # and does NOT restart us. Non-zero exit = crash = launcher restarts.
         import os
         os._exit(0)
+
+    def _shutdown_and_quit(self, icon, item) -> None:
+        """Stop the agent + all systemd services (frees VRAM), then quit."""
+        # Flip the icon to "transitioning" so the user sees something is happening
+        self._set_state("transitioning",
+                        since_ts=self.since_ts,
+                        active_competition=self.active_competition)
+        try:
+            requests.post(f"{API_BASE}/system/shutdown", timeout=5)
+        except Exception:
+            # API may already be unreachable — that's fine, fire the script
+            # directly via WSL as a fallback
+            try:
+                import subprocess as _sp
+                _sp.Popen(
+                    ["wsl.exe", "-d", "Ubuntu-24.04", "--",
+                     "bash", "/home/keehar/kaggle-agent/scripts/shutdown_all.sh"],
+                    stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                )
+            except Exception:
+                pass
+        # Give the shutdown script a moment to start before we exit the tray
+        import time as _t
+        _t.sleep(2)
+        self._quit(icon, item)
 
     def _call_action(self, action: str) -> None:
         if not self._action_lock.acquire(blocking=False):

@@ -409,6 +409,27 @@ def system_restart() -> dict:
         raise HTTPException(500, f"restart failed: {e}")
 
 
+@app.post("/system/shutdown")
+def system_shutdown() -> dict:
+    """Stop the agent, all services, and Ollama (frees VRAM).
+
+    Runs scripts/shutdown_all.sh asynchronously — this API service will
+    itself be stopped partway through, so the caller may see the response
+    arrive but a subsequent request will fail. That's expected.
+    """
+    try:
+        import subprocess
+        subprocess.Popen(
+            ["bash", str(REPO_ROOT / "scripts" / "shutdown_all.sh")],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return {"ok": True, "note": "shutdown in progress — API will go offline shortly"}
+    except Exception as e:
+        raise HTTPException(500, f"shutdown failed: {e}")
+
+
 # ---------- competitions ----------
 
 class CompetitionNew(BaseModel):
