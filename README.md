@@ -1,10 +1,10 @@
 # Kaggle Agent
 
 Autonomous Kaggle competition agent running locally on Windows + WSL2 + RTX
-5070. Persistent tmux session with Claude Code at the wheel, talking to a
+GPU. Persistent tmux session with Claude Code at the wheel, talking to a
 FastAPI backend, a Windows tray app, and you via Telegram and a web UI.
 
-This README is the **disaster-recovery guide** — everything you need to
+This README is the **fresh-install guide** — everything you need to
 rebuild the system from a fresh Windows install. Follow top-to-bottom.
 
 ---
